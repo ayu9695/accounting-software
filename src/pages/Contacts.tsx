@@ -116,8 +116,8 @@ const Contacts = () => {
       </div>
 
       <ContactTabs
-        contacts={contacts}
-        companies={companies}
+        contacts={contacts || []}
+        companies={companies || []}
         onAddContact={() => setIsAddContactDialogOpen(true)}
         onAddCompany={() => setIsAddCompanyDialogOpen(true)}
       />
@@ -176,7 +176,7 @@ const Contacts = () => {
                     <SelectValue placeholder="Select company" />
                   </SelectTrigger>
                   <SelectContent>
-                    {companies.map((company) => (
+                    {(companies || []).map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
                       </SelectItem>

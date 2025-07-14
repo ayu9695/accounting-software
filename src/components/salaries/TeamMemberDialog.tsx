@@ -12,6 +12,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+interface Department {
+  _id: string;
+  name: string;
+}
+
+interface Designation {
+  _id: string;
+  name: string;
+}
+
 interface TeamMember {
   id: string;
   name: string;
@@ -27,8 +37,16 @@ interface TeamMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingMember: Partial<TeamMember> | null;
-  onSave: (memberData: Omit<TeamMember, 'id' | 'isActive'>) => void;
-  departments: string[];
+  onSave: (memberData: {
+    name: string;
+    email: string;
+    department: string;
+    designation: string;
+    baseSalary: number;
+    joinDate: string;
+  }) => void;
+  departments: Department[];
+  designations: Designation[];
 }
 
 export const TeamMemberDialog: React.FC<TeamMemberDialogProps> = ({
@@ -36,12 +54,13 @@ export const TeamMemberDialog: React.FC<TeamMemberDialogProps> = ({
   onOpenChange,
   editingMember,
   onSave,
-  departments
+  departments,
+  designations
 }) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    department: departments[0] || "",
+    department: "",
     designation: "",
     baseSalary: "",
     joinDate: new Date().toISOString().split('T')[0]
@@ -52,8 +71,8 @@ export const TeamMemberDialog: React.FC<TeamMemberDialogProps> = ({
       setFormData({
         name: editingMember.name || "",
         email: editingMember.email || "",
-        department: editingMember.department || departments[0] || "",
-        designation: editingMember.designation || "",
+        department: editingMember.department || departments[0]?._id || "",
+        designation: editingMember.designation || designations[0]?._id || "",
         baseSalary: editingMember.baseSalary?.toString() || "",
         joinDate: editingMember.joinDate || new Date().toISOString().split('T')[0]
       });
@@ -61,24 +80,27 @@ export const TeamMemberDialog: React.FC<TeamMemberDialogProps> = ({
       setFormData({
         name: "",
         email: "",
-        department: departments[0] || "",
-        designation: "",
+        department: departments[0]?._id || "",
+        designation: designations[0]?._id || "",
         baseSalary: "",
         joinDate: new Date().toISOString().split('T')[0]
       });
     }
-  }, [editingMember, departments, open]);
+  }, [editingMember, departments, designations, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.name || !formData.email || !formData.department || !formData.designation || !formData.baseSalary) {
       return;
     }
 
     onSave({
-      ...formData,
-      baseSalary: parseFloat(formData.baseSalary) || 0
+      name: formData.name,
+      email: formData.email,
+      department: formData.department,
+      designation: formData.designation,
+      baseSalary: parseFloat(formData.baseSalary),
+      joinDate: formData.joinDate
     });
 
     onOpenChange(false);
@@ -132,20 +154,26 @@ export const TeamMemberDialog: React.FC<TeamMemberDialogProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                      <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="designation">Designation *</Label>
-                <Input
-                  id="designation"
+                <Select
                   value={formData.designation}
-                  onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                  placeholder="Enter designation"
-                  required
-                />
+                  onValueChange={(value) => setFormData({ ...formData, designation: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select designation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {designations.map((desig) => (
+                      <SelectItem key={desig._id} value={desig._id}>{desig.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

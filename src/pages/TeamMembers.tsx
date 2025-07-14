@@ -1,35 +1,17 @@
-import React, { useState, useEffect } from "react";
+// ✅ REWRITTEN COMPONENT: Dynamic fetch of departments, designations, and employees
+
+import React, { useEffect, useMemo, useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit2, Trash2, Users, Filter, ArrowLeft } from "lucide-react";
+import { PlusCircle, Users, Filter, ArrowLeft, Edit2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
-import { TeamMemberDialog } from "@/components/salaries/TeamMemberDialog";
 import { Link } from "react-router-dom";
+import { TeamMemberDialog } from "@/components/salaries/TeamMemberDialog";
+import { toast } from "@/components/ui/use-toast";
 
-interface TeamMember {
-  _id: string;
-  name: string;
-  email: string;
-  department: Department;
-  designation: Designation;
-  baseSalary: number;
-  joinDate: string;
-  isActive: boolean;
-}
-
-// const initialTeamMembers: TeamMember[] = [
-//   { id: "1", name: "Rajesh Kumar", email: "rajesh@company.com", department: "Technical", designation: "Senior Developer", baseSalary: 85000, joinDate: "2023-01-15", isActive: true },
-//   { id: "2", name: "Priya Sharma", email: "priya@company.com", department: "Sales", designation: "Project Manager", baseSalary: 95000, joinDate: "2022-08-20", isActive: true },
-//   { id: "3", name: "Amit Patel", email: "amit@company.com", department: "Technical", designation: "UI/UX Designer", baseSalary: 75000, joinDate: "2023-03-10", isActive: true },
-//   { id: "4", name: "Sneha Gupta", email: "sneha@company.com", department: "Digital", designation: "Business Analyst", baseSalary: 80000, joinDate: "2022-11-05", isActive: true },
-//   { id: "5", name: "Rahul Verma", email: "rahul@company.com", department: "Digital", designation: "Marketing Specialist", baseSalary: 70000, joinDate: "2023-02-18", isActive: true },
-// ];
-
-const departments = ["Sales", "Digital", "Technical"];
 interface Department {
   _id: string;
   name: string;
@@ -40,78 +22,152 @@ interface Designation {
   name: string;
 }
 
+interface TeamMember {
+  _id: string;
+  name: string;
+  email: string;
+  department: string;
+  designation: string;
+  baseSalary: number;
+  joinDate: string;
+  isActive: boolean;
+}
+
 const TeamMembers: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  // const [isDialogOpen, setIsDialogOpen] = useState(false);
-  // const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
-  const filteredMembers = teamMembers.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         member.email.toLowerCase().includes(searchQuery.toLowerCase())
-                         ;
-    const matchesDepartment = selectedDepartment === "all" || 'Sales' === selectedDepartment;
-    return matchesSearch && matchesDepartment;
-  });
-
-  // const handleAddMember = (memberData: Omit<TeamMember, 'id' | 'isActive'>) => {
-  //   const newMember: TeamMember = {
-  //     ...memberData,
-  //     id: Date.now().toString(),
-  //     isActive: true
-  //   };
-  //   setTeamMembers([...teamMembers, newMember]);
-  //   toast.success("Team member added successfully");
-  // };
-
-  // const handleUpdateMember = (memberData: Omit<TeamMember, 'id' | 'isActive'>) => {
-  //   if (!editingMember) return;
-    
-  //   setTeamMembers(prev => prev.map(member => 
-  //     member.id === editingMember.id 
-  //       ? { ...member, ...memberData }
-  //       : member
-  //   ));
-    
-  //   setEditingMember(null);
-  //   toast.success("Team member updated successfully");
-  // };
-
-  // const handleDeleteMember = (id: string) => {
-  //   setTeamMembers(prev => prev.filter(member => member.id !== id));
-  //   toast.success("Team member removed");
-  // };
-  
   useEffect(() => {
-    const fetchTeamMembers = async () => {
-      console.log("Running fetchTeamMembers API");
+    const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:3000/api/employees", {
-          method: "GET",
-          credentials: "include"
-        });
-        const data: TeamMember[] = await response.json();
-        setTeamMembers(data);
-        console.log(data);
+        const [empRes, deptRes, desigRes] = await Promise.all([
+          fetch("http://localhost:3000/api/employees", { credentials: "include" }),
+          fetch("http://localhost:3000/api/departments", { credentials: "include" }),
+          fetch("http://localhost:3000/api/designations", { credentials: "include" }),
+        ]);
+
+        const [empData, deptData, desigData] = await Promise.all([
+          empRes.json(),
+          deptRes.json(),
+          desigRes.json()
+        ]);
+
+        setTeamMembers(empData);
+        setDepartments(deptData);
+        setDesignations(desigData);
       } catch (err) {
-        console.error("Error fetching users:", err);
+        console.error("Error fetching data:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchTeamMembers();
-  }, []); // 👀 Empty dependency array ensures only once
+    fetchData();
+  }, []);
 
+  const departmentMap = useMemo(() => {
+  const map = new Map<string, string>();
+  departments.forEach(d => map.set(d._id, d.name));
+  return map;
+}, [departments]);
+
+const designationMap = useMemo(() => {
+  const map = new Map<string, string>();
+  designations.forEach(d => map.set(d._id, d.name));
+  return map;
+}, [designations]);
+
+  const filteredMembers = teamMembers.filter(member => {
+    const matchesSearch =
+      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesDepartment =
+      selectedDepartment === "all" || member.department === selectedDepartment;
+
+    return matchesSearch && matchesDepartment;
+  });
 
   const totalSalaryBudget = filteredMembers.reduce((sum, member) => sum + member.baseSalary, 0);
   const activeMembers = filteredMembers.filter(member => member.isActive).length;
 
+const handleAddMember = async (newMember: any) => {
+  try {
+    const response = await fetch('http://localhost:3000/api/employees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(newMember)
+    });
+    console.log("new memeber added: ", newMember);
+
+    if (!response.ok) throw new Error('Failed to create user');
+    const created = await response.json();
+
+    // Add to local state (optional for instant UI feedback)
+    setTeamMembers(prev => [...prev, created]);
+
+    toast({ title: 'Success', description: "Team member added successfully"});
+  } catch (err) {
+    console.error(err);
+    toast({ title: 'Error', description: "Error creating user", variant: 'destructive' });
+  }
+};
+
+const handleDeleteMember = async (id: string) => {
+  try {
+    const response = await fetch(`http://localhost:3000/api/employees`, {
+      method: 'DELETE',
+      credentials: 'include',
+      body: JSON.stringify(id)
+    });
+    if (!response.ok) throw new Error('Delete failed');
+
+    setTeamMembers(prev => prev.filter(member => member._id !== id));
+    toast({ title: "Deleted", description: "Team member removed successfully" });
+  } catch (err) {
+    console.error(err);
+    toast({ title: "Error", description: "Error deleting user", variant: "destructive" });
+  }
+};
+
+  const handleUpdateMember = async (updatedMember: any) => {
+    // Replace this with actual API PATCH call in future
+    console.log("Updating member:", updatedMember);
+    try {
+    const response = await fetch(`http://localhost:3000/api/employees`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        id: editingMember?._id, // ✅ include ID inside body
+        ...updatedMember
+      })
+    });
+
+    if (!response.ok) throw new Error('Failed to update user');
+    const updated = await response.json();
+
+    setTeamMembers(prev =>
+      prev.map(member => (member._id === updated._id ? updated : member))
+    );
+
+    toast({ title: 'Success', description: "Team member updated successfully" });
+  } catch (err) {
+    console.error(err);
+    toast({ title: 'Error', description: "Error updating user", variant: 'destructive' });
+  }
+  };
+
   return (
     <PageLayout title="Team Members">
       <div className="space-y-6">
-        {/* Header Section with Back Navigation */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link to="/salaries">
@@ -125,13 +181,12 @@ const TeamMembers: React.FC = () => {
               <p className="text-gray-600">Manage your team members and their information</p>
             </div>
           </div>
-          {/* <Button onClick={() => setIsDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => setIsDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Team Member
-          </Button> */}
+          </Button>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardHeader className="pb-2">
@@ -164,7 +219,6 @@ const TeamMembers: React.FC = () => {
           </Card>
         </div>
 
-        {/* Filters */}
         <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -186,7 +240,7 @@ const TeamMembers: React.FC = () => {
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
                   {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -203,7 +257,7 @@ const TeamMembers: React.FC = () => {
                   <TableHead className="text-right">Base Salary</TableHead>
                   <TableHead>Join Date</TableHead>
                   <TableHead>Status</TableHead>
-                  {/* <TableHead className="text-center">Actions</TableHead> */}
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -211,12 +265,8 @@ const TeamMembers: React.FC = () => {
                   <TableRow key={member._id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
                     <TableCell className="text-gray-600">{member.email}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        hi
-                      </span>
-                    </TableCell>
-                    <TableCell>to be populated</TableCell>
+                    <TableCell>{departmentMap.get(member.department) || "-"}</TableCell>
+                    <TableCell>{designationMap.get(member.designation) || "-"}</TableCell>
                     <TableCell className="text-right font-medium">₹{member.baseSalary.toLocaleString()}</TableCell>
                     <TableCell>{new Date(member.joinDate).toLocaleDateString()}</TableCell>
                     <TableCell>
@@ -226,7 +276,7 @@ const TeamMembers: React.FC = () => {
                         {member.isActive ? "Active" : "Inactive"}
                       </span>
                     </TableCell>
-                    {/* <TableCell>
+                    <TableCell>
                       <div className="flex justify-center space-x-2">
                         <Button
                           variant="ghost"
@@ -241,13 +291,12 @@ const TeamMembers: React.FC = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteMember(member.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
+                          onClick={() => handleDeleteMember(member._id)}
+                          className="text-red-600 hover:text-red-800">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell> */}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -255,7 +304,7 @@ const TeamMembers: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* <TeamMemberDialog
+        <TeamMemberDialog
           open={isDialogOpen}
           onOpenChange={(open) => {
             setIsDialogOpen(open);
@@ -264,7 +313,8 @@ const TeamMembers: React.FC = () => {
           editingMember={editingMember}
           onSave={editingMember ? handleUpdateMember : handleAddMember}
           departments={departments}
-        /> */}
+          designations={designations}
+        />
       </div>
     </PageLayout>
   );
