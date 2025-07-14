@@ -119,7 +119,7 @@ export const ContactTabs: React.FC<ContactTabsProps> = ({
       <TabsContent value="companies">
         <Card>
           <CardHeader>
-            <CardTitle>All Companies ({companies.length})</CardTitle>
+            <CardTitle>All Companies ({companies?.length || []})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
