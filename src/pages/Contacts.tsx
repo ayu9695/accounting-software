@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PageLayout from "@/components/PageLayout";
 import { ContactTabs } from "@/components/contacts/ContactTabs";
 import { useContacts } from "@/hooks/useContacts";
@@ -23,11 +23,19 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
+import { Building, Plus } from "lucide-react";
 
 const Contacts = () => {
   const { contacts, companies, addContact, addCompany } = useContacts();
   const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
   const [isAddCompanyDialogOpen, setIsAddCompanyDialogOpen] = useState(false);
+
+    // Company autocomplete states
+  const [companySearchValue, setCompanySearchValue] = useState("");
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+  const [filteredCompanies, setFilteredCompanies] = useState(companies || []);
+  const companyInputRef = useRef<HTMLInputElement>(null);
+  const companyDropdownRef = useRef<HTMLDivElement>(null);
   
   const [newContact, setNewContact] = useState({
     name: "",
@@ -57,6 +65,80 @@ const Contacts = () => {
     notes: ""
   });
 
+  // Filter companies based on search input
+  useEffect(() => {
+    if (!companies) return;
+    
+    const filtered = companies.filter(company =>
+      company.name.toLowerCase().includes(companySearchValue.toLowerCase()) ||
+      company.email.toLowerCase().includes(companySearchValue.toLowerCase())
+    );
+    setFilteredCompanies(filtered);
+  }, [companySearchValue, companies]);
+
+  // Handle clicking outside of company dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        companyDropdownRef.current &&
+        !companyDropdownRef.current.contains(event.target as Node) &&
+        !companyInputRef.current?.contains(event.target as Node)
+      ) {
+        setShowCompanyDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleCompanySelect = (company: any) => {
+    setCompanySearchValue(company.name);
+    setNewContact({
+      ...newContact,
+      companyId: company.id,
+      companyType: company.type
+    });
+    setShowCompanyDropdown(false);
+  };
+
+  const handleAddNewCompany = () => {
+    setShowCompanyDropdown(false);
+    setIsAddCompanyDialogOpen(true);
+  };
+
+  const handleCompanyInputFocus = () => {
+    setShowCompanyDropdown(true);
+  };
+
+  const handleCompanyInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCompanySearchValue(value);
+    setShowCompanyDropdown(true);
+    
+    // Clear selection if user types something different
+    if (newContact.companyId && value !== companies?.find(c => c.id === newContact.companyId)?.name) {
+      setNewContact({
+        ...newContact,
+        companyId: "",
+        companyType: "client"
+      });
+    }
+  };
+
+   const resetContactForm = () => {
+    setNewContact({
+      name: "",
+      email: "",
+      phone: "",
+      position: "",
+      companyId: "",
+      type: "individual",
+      companyType: "client"
+    });
+    setCompanySearchValue("");
+  };
+
   const handleAddContact = async () => {
     if (!newContact.name || !newContact.email) {
       toast.error("Please fill in required fields");
@@ -66,15 +148,7 @@ const Contacts = () => {
     try{
     await addContact(newContact);
     toast.success("Contact added successfully");
-    setNewContact({
-      name: "",
-      email: "",
-      phone: "",
-      position: "",
-      companyId: "",
-      type: "individual",
-      companyType: "vendor"
-    });
+    resetContactForm();
     setIsAddContactDialogOpen(false);
     } catch(err) {
     toast.error("Failed to add contact");
@@ -95,7 +169,16 @@ const Contacts = () => {
     };
 
     try{
-    await addCompany(companyData);
+    const savedCompany = await addCompany(companyData);
+    // Auto-select the newly created company in the contact form
+      if (isAddContactDialogOpen) {
+        setCompanySearchValue(savedCompany.name);
+        setNewContact({
+          ...newContact,
+          companyId: savedCompany.id,
+          companyType: savedCompany.type
+        });
+      }
     setNewCompany({
       name: "",
       email: "",
@@ -178,7 +261,7 @@ const Contacts = () => {
                   onChange={(e) => setNewContact({ ...newContact, position: e.target.value })}
                 />
               </div>
-              <div>
+              {/* <div>
                 <Label htmlFor="contactCompany">Company</Label>
                 <Select
                   value={newContact.companyId}
@@ -202,6 +285,69 @@ const Contacts = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div> */}
+              <div className="relative">
+                <Label htmlFor="contactCompany">Company</Label>
+                <Input
+                  ref={companyInputRef}
+                  id="contactCompany"
+                  value={companySearchValue}
+                  onChange={handleCompanyInputChange}
+                  onFocus={handleCompanyInputFocus}
+                  placeholder="Search for a company..."
+                  className="w-full"
+                />
+                
+                {/* Company Dropdown */}
+                {showCompanyDropdown && (
+                  <div 
+                    ref={companyDropdownRef}
+                    className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                  >
+                    {/* Add New Company Option */}
+                    <div
+                      onClick={handleAddNewCompany}
+                      className="flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 border-b border-gray-100"
+                    >
+                      <Plus className="h-4 w-4 mr-2 text-blue-600" />
+                      <Building className="h-4 w-4 mr-2 text-blue-600" />
+                      <span className="text-blue-600 font-medium">Add New Company</span>
+                    </div>
+                    
+                    {/* Company List */}
+                    {filteredCompanies.length > 0 ? (
+                      filteredCompanies.map((company) => (
+                        <div
+                          key={company.id}
+                          onClick={() => handleCompanySelect(company)}
+                          className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
+                        >
+                          <div>
+                            <div className="font-medium">{company.name}</div>
+                            <div className="text-gray-500 text-xs">{company.email}</div>
+                          </div>
+                          <div className="flex items-center">
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              company.type === 'client' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-orange-100 text-orange-800'
+                            }`}>
+                              {company.type}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : companySearchValue ? (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        No companies found for "{companySearchValue}"
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        Type to search companies...
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
