@@ -43,13 +43,14 @@ const Contacts = () => {
     email: "",
     phone: "",
     address: "",
+    extension: "",
     city: "",
     state: "",
     pincode: "",
     gst: "",
     panNumber: "",
     type: "client" as "client" | "vendor",
-    contactPerson: "",
+    contactPerson: [],
     website: "",
     industry: "",
     notes: ""
@@ -74,7 +75,7 @@ const Contacts = () => {
     toast.success("Contact added successfully");
   };
 
-  const handleAddCompany = () => {
+  const handleAddCompany = async () => {
     if (!newCompany.name || !newCompany.email || !newCompany.gst || !newCompany.type) {
       toast.error("Please fill in all required fields (Name, Email, GST, Type)");
       return;
@@ -87,25 +88,30 @@ const Contacts = () => {
       createdAt: new Date().toISOString().split('T')[0]
     };
 
-    addCompany(companyData);
+    try{
+    await addCompany(companyData);
     setNewCompany({
       name: "",
       email: "",
       phone: "",
       address: "",
+      extension: "",
       city: "",
       state: "",
       pincode: "",
       gst: "",
       panNumber: "",
       type: "client",
-      contactPerson: "",
+      contactPerson: [],
       website: "",
       industry: "",
       notes: ""
     });
     setIsAddCompanyDialogOpen(false);
     toast.success("Company added successfully");
+  } catch (err) {
+  toast.error("Failed to add company");
+}
   };
 
   return (

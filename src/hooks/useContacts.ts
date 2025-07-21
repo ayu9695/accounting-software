@@ -43,6 +43,7 @@ export const useContacts = () => {
           name: c.name,
           email: c.email || '',
           phone: c.phone || '',
+          extension: c.extension || '',
           address: c.address || '',
           website: c.website || '',
           industry: c.industry || '',
@@ -96,27 +97,44 @@ export const useContacts = () => {
     setContacts(prev => prev.filter(contact => contact.id !== id));
   };
 
-  const addCompany = (companyData: any) => {
+  const addCompany = async (companyData: any) => {
+    const endpoint = companyData.type === "client" ? "/clients" : "/vendors";
+    try {
+    const res = await fetch(`${baseUrl}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify(companyData)
+    });
+    if (!res.ok) throw new Error(`Failed to add ${companyData.type}`);
+    const savedCompany = await res.json();
     const newCompany: Company = {
-      id: companyData.id,
-      name: companyData.name,
-      email: companyData.email,
-      phone: companyData.phone || '',
-      address: companyData.address || '',
-      city: companyData.city || '',
-      state: companyData.state || '',
-      pincode: companyData.pincode || '',
-      gst: companyData.gst,
-      panNumber: companyData.panNumber || '',
-      type: companyData.type,
-      contactPerson: companyData.contactPerson || '',
-      notes: companyData.notes || '',
+      id: savedCompany.id,
+      name: savedCompany.name,
+      email: savedCompany.email,
+      phone: savedCompany.phone || '',
+      extension: savedCompany.extension || '+91',
+      address: savedCompany.address || '',
+      city: savedCompany.city || '',
+      state: savedCompany.state || '',
+      pincode: savedCompany.pincode || '',
+      gst: savedCompany.gst,
+      panNumber: savedCompany.panNumber || '',
+      type: savedCompany.type,
+      contactPerson: savedCompany.contactPerson || '',
+      notes: savedCompany.notes || '',
       contacts: [],
-      createdAt: companyData.createdAt
+      createdAt: savedCompany.createdAt
     };
     setCompanies(prev => [...prev, newCompany]);
     return newCompany;
-  };
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+};
 
   const updateCompany = (id: string, updates: Partial<Company>) => {
     setCompanies(prev => prev.map(company => 

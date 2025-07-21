@@ -16,10 +16,11 @@ export interface Company {
   city: string;
   state: string;
   pincode: string;
+  extension: string;
   gst: string;
   panNumber?: string;
   type: 'client' | 'vendor';
-  contactPerson?: string;
+  contactPerson?: [];
   notes?: string;
   website?: string;
   industry?: string;
