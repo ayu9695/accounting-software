@@ -203,7 +203,7 @@ const Contacts = () => {
 
       {/* Add Company Dialog */}
       <Dialog open={isAddCompanyDialogOpen} onOpenChange={setIsAddCompanyDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Company</DialogTitle>
             <DialogDescription>
