@@ -35,7 +35,8 @@ const Contacts = () => {
     phone: "",
     position: "",
     companyId: "",
-    type: "individual" as const
+    type: "individual" as const,
+    companyType: "client" as "client" | "vendor",
   });
 
   const [newCompany, setNewCompany] = useState({
@@ -56,23 +57,28 @@ const Contacts = () => {
     notes: ""
   });
 
-  const handleAddContact = () => {
+  const handleAddContact = async () => {
     if (!newContact.name || !newContact.email) {
       toast.error("Please fill in required fields");
       return;
     }
 
-    addContact(newContact);
+    try{
+    await addContact(newContact);
+    toast.success("Contact added successfully");
     setNewContact({
       name: "",
       email: "",
       phone: "",
       position: "",
       companyId: "",
-      type: "individual"
+      type: "individual",
+      companyType: "vendor"
     });
     setIsAddContactDialogOpen(false);
-    toast.success("Contact added successfully");
+    } catch(err) {
+    toast.error("Failed to add contact");
+    }
   };
 
   const handleAddCompany = async () => {
@@ -176,8 +182,15 @@ const Contacts = () => {
                 <Label htmlFor="contactCompany">Company</Label>
                 <Select
                   value={newContact.companyId}
-                  onValueChange={(value) => setNewContact({ ...newContact, companyId: value })}
-                >
+                    onValueChange={(value) => {
+                      const selectedCompany = companies.find(c => c.id === value);
+                      setNewContact({
+                        ...newContact,
+                        companyId: value,
+                        companyType: selectedCompany?.type // ✅ 'client' or 'vendor'
+                      });
+                    }}                
+                  >
                   <SelectTrigger>
                     <SelectValue placeholder="Select company" />
                   </SelectTrigger>

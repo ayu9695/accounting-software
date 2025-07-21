@@ -78,13 +78,50 @@ export const useContacts = () => {
     }
   };
 
-  const addContact = (contact: Omit<Contact, 'id'>) => {
-    const newContact: Contact = {
-      ...contact,
-      id: Date.now().toString()
+  const addContact = async (contact: Omit<Contact, 'id'>) => {
+    try {
+      console.log("contact's company type is: ", contact.companyType);
+    const endpoint =
+      contact.companyType === 'client'
+        ? `/client-contacts/${contact.companyId}`
+        : `/vendor-contacts/${contact.companyId}`;
+
+    const res = await fetch(`${baseUrl}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify([{
+        contactPerson:[{
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        position: contact.position
+        }]
+      }])
+    });
+    const savedContact = await res.json();
+
+    if (!res.ok) {
+      const errorMsg = savedContact?.message || `Failed to add contact to ${contact.companyType}`;
+      throw new Error(errorMsg);
     };
-    setContacts(prev => [...prev, newContact]);
+
+    const newContact: Contact = {
+      ...savedContact,
+      id: savedContact.id || Date.now().toString(),
+      companyId: contact.companyId,
+      type: 'individual',
+      companyType: contact.companyType
+    };
+
+    setContacts(prev => [...(prev || []), newContact]);
     return newContact;
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
   };
 
   const updateContact = (id: string, updates: Partial<Contact>) => {

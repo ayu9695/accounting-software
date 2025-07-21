@@ -36,6 +36,7 @@ export interface Contact {
   position?: string;
   companyId?: string;
   type: 'individual' | 'company';
+  companyType?: 'client' | 'vendor' | '';
 }
 
 export interface Invoice {
