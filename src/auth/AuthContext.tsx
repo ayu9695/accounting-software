@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("http://localhost:3000/api/me", {
+        const res = await fetch("https://accounting-app-production.up.railway.app/api/me", {
           credentials: "include",
         });
 
@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData) => setUser(userData);
   const logout = async () => {
-    await fetch("http://localhost:3000/api/logout", {
+    await fetch("https://accounting-app-production.up.railway.app/api/logout", {
       method: "POST",
       credentials: "include",
     });

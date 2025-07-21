@@ -29,7 +29,7 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:3000/api/login", {
+      const response = await fetch("https://accounting-app-production.up.railway.app/api/login", {
         method: "POST",
         credentials: "include", // Include cookies
         headers: {

@@ -19,8 +19,8 @@ export const useContacts = () => {
     setLoading(true);
     try {
       const [clientsRes, vendorsRes] = await Promise.all([
-        fetch('http://localhost:3000/api/clients-with-contacts', { credentials: 'include' }),
-        fetch('http://localhost:3000/api/vendors-with-contacts', { credentials: 'include' })
+        fetch('https://accounting-app-production.up.railway.app/api/clients-with-contacts', { credentials: 'include' }),
+        fetch('https://accounting-app-production.up.railway.app/api/vendors-with-contacts', { credentials: 'include' })
       ]);
 
       const [clients, vendors] = await Promise.all([

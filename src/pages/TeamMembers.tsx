@@ -47,9 +47,9 @@ const TeamMembers: React.FC = () => {
     const fetchData = async () => {
       try {
         const [empRes, deptRes, desigRes] = await Promise.all([
-          fetch("http://localhost:3000/api/employees", { credentials: "include" }),
-          fetch("http://localhost:3000/api/departments", { credentials: "include" }),
-          fetch("http://localhost:3000/api/designations", { credentials: "include" }),
+          fetch("https://accounting-app-production.up.railway.app/api/employees", { credentials: "include" }),
+          fetch("https://accounting-app-production.up.railway.app/api/departments", { credentials: "include" }),
+          fetch("https://accounting-app-production.up.railway.app/api/designations", { credentials: "include" }),
         ]);
 
         const [empData, deptData, desigData] = await Promise.all([
@@ -99,7 +99,7 @@ const designationMap = useMemo(() => {
 
 const handleAddMember = async (newMember: any) => {
   try {
-    const response = await fetch('http://localhost:3000/api/employees', {
+    const response = await fetch('https://accounting-app-production.up.railway.app/api/employees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -122,7 +122,7 @@ const handleAddMember = async (newMember: any) => {
 
 const handleDeleteMember = async (id: string) => {
   try {
-    const response = await fetch(`http://localhost:3000/api/employees`, {
+    const response = await fetch(`https://accounting-app-production.up.railway.app/api/employees`, {
       method: 'DELETE',
       credentials: 'include',
       body: JSON.stringify(id)
@@ -141,7 +141,7 @@ const handleDeleteMember = async (id: string) => {
     // Replace this with actual API PATCH call in future
     console.log("Updating member:", updatedMember);
     try {
-    const response = await fetch(`http://localhost:3000/api/employees`, {
+    const response = await fetch(`https://accounting-app-production.up.railway.app/api/employees`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

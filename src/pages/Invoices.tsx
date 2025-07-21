@@ -26,7 +26,7 @@ const Invoices: React.FC = () => {
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/invoices', {
+        const response = await fetch('https://accounting-app-production.up.railway.app/api/invoices', {
           credentials: 'include'
         });
         const data = await response.json();

@@ -153,7 +153,7 @@ const Settings = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/settings', {
+        const response = await fetch('https://accounting-app-production.up.railway.app/api/settings', {
           method: 'GET',
           credentials: 'include', // 🔑 This makes the browser send cookies
         });

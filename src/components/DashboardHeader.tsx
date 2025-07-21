@@ -30,7 +30,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ title }) => {
 
     const handleLogout = async () => {
     try {
-      const res = await fetch("http://localhost:3000/api/logout", {
+      const res = await fetch("https://accounting-app-production.up.railway.app/api/logout", {
         method: "POST",
         credentials: "include", // includes HttpOnly cookie
       });
