@@ -14,13 +14,14 @@ export const useContacts = () => {
     total: 0,
     totalPages: 0
   });
+  const baseUrl = import.meta.env.VITE_API_URL;
 
  const fetchCompanies = async () => {
     setLoading(true);
     try {
       const [clientsRes, vendorsRes] = await Promise.all([
-        fetch('https://accounting-app-production.up.railway.app/api/clients-with-contacts', { credentials: 'include' }),
-        fetch('https://accounting-app-production.up.railway.app/api/vendors-with-contacts', { credentials: 'include' })
+        fetch(`${baseUrl}/clients-with-contacts`, { credentials: 'include' }),
+        fetch(`${baseUrl}/vendors-with-contacts`, { credentials: 'include' })
       ]);
 
       const [clients, vendors] = await Promise.all([

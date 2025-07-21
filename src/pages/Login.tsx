@@ -27,9 +27,11 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const baseUrl = import.meta.env.VITE_API_URL;
 
     try {
-      const response = await fetch("https://accounting-app-production.up.railway.app/api/login", {
+      console.log("base url is : ", baseUrl);
+      const response = await fetch(`${baseUrl}/login`, {
         method: "POST",
         credentials: "include", // Include cookies
         headers: {

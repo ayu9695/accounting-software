@@ -45,12 +45,13 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const baseUrl = import.meta.env.VITE_API_URL;
 
   // Load user on mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("https://accounting-app-production.up.railway.app/api/me", {
+        const res = await fetch(`${baseUrl}/me`, {
           credentials: "include",
         });
 
@@ -77,7 +78,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData) => setUser(userData);
   const logout = async () => {
-    await fetch("https://accounting-app-production.up.railway.app/api/logout", {
+    await fetch(`${baseUrl}/logout`, {
       method: "POST",
       credentials: "include",
     });

@@ -59,11 +59,12 @@ const Profile = () => {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const baseUrl = import.meta.env.VITE_API_URL;
 
   // useEffect(() => {
   //   const fetchCurrentUser = async () => {
   //     try {
-  //       const response = await fetch('https://accounting-app-production.up.railway.app/api/user', {
+  //       const response = await fetch(`${baseUrl}/user', {
   //         method: 'GET',
   //         credentials: 'include'
   //       });
@@ -79,7 +80,7 @@ const Profile = () => {
 
   //   const fetchUsers = async () => {
   //     try {
-  //       const response = await fetch('https://accounting-app-production.up.railway.app/api/users', {
+  //       const response = await fetch(`${baseUrl}/users', {
   //         method: 'GET',
   //         credentials: 'include'
   //       });
@@ -97,7 +98,7 @@ const Profile = () => {
     useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        const response = await fetch('https://accounting-app-production.up.railway.app/api/user', {
+        const response = await fetch(`${baseUrl}/user`, {
           method: 'GET',
           credentials: 'include'
         });
@@ -119,7 +120,7 @@ useEffect(() => {
   const fetchUsers = async () => {
     console.log("Running fetchusers API");
     try {
-      const response = await fetch('https://accounting-app-production.up.railway.app/api/users', {
+      const response = await fetch(`${baseUrl}/users`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -155,7 +156,7 @@ useEffect(() => {
       return;
     }
     try {
-      const response = await fetch('https://accounting-app-production.up.railway.app/api/users', {
+      const response = await fetch(`${baseUrl}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -174,7 +175,7 @@ useEffect(() => {
 
   const handleSaveProfile = async () => {
     try {
-      const response = await fetch('https://accounting-app-production.up.railway.app/api/user', {
+      const response = await fetch(`${baseUrl}/user`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -192,7 +193,7 @@ useEffect(() => {
 
   const handleToggleOnOff = async (userId: string) => {
   try {
-    const response = await fetch('https://accounting-app-production.up.railway.app/api/users/toggle-status', {
+    const response = await fetch(`${baseUrl}/users/toggle-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -223,7 +224,7 @@ useEffect(() => {
     return;
   }
   try {
-    const res = await fetch('https://accounting-app-production.up.railway.app/api/user', {
+    const res = await fetch(`${baseUrl}/user`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json'
@@ -264,7 +265,7 @@ useEffect(() => {
   console.log("userid: ", currentUser._id, " oldpassword: ", oldPassword, " new password: ", newPassword);
 
   try {
-    const response = await fetch('https://accounting-app-production.up.railway.app/api/user/password', {
+    const response = await fetch(`${baseUrl}/user/password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

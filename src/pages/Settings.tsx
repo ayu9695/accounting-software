@@ -149,11 +149,12 @@ const Settings = () => {
       setTaxSettings(JSON.parse(savedTaxSettings));
     }
   }, []);
+  const baseUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch('https://accounting-app-production.up.railway.app/api/settings', {
+        const response = await fetch(`${baseUrl}/settings`, {
           method: 'GET',
           credentials: 'include', // 🔑 This makes the browser send cookies
         });

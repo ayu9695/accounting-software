@@ -22,11 +22,12 @@ const Invoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const baseUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
-        const response = await fetch('https://accounting-app-production.up.railway.app/api/invoices', {
+        const response = await fetch(`${baseUrl}/invoices`, {
           credentials: 'include'
         });
         const data = await response.json();

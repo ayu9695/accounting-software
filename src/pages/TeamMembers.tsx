@@ -47,9 +47,9 @@ const TeamMembers: React.FC = () => {
     const fetchData = async () => {
       try {
         const [empRes, deptRes, desigRes] = await Promise.all([
-          fetch("https://accounting-app-production.up.railway.app/api/employees", { credentials: "include" }),
-          fetch("https://accounting-app-production.up.railway.app/api/departments", { credentials: "include" }),
-          fetch("https://accounting-app-production.up.railway.app/api/designations", { credentials: "include" }),
+          fetch(`${baseUrl}/employees`, { credentials: "include" }),
+          fetch(`${baseUrl}/departments`, { credentials: "include" }),
+          fetch(`${baseUrl}/designations`, { credentials: "include" }),
         ]);
 
         const [empData, deptData, desigData] = await Promise.all([
@@ -96,10 +96,11 @@ const designationMap = useMemo(() => {
 
   const totalSalaryBudget = filteredMembers.reduce((sum, member) => sum + member.baseSalary, 0);
   const activeMembers = filteredMembers.filter(member => member.isActive).length;
+  const baseUrl = import.meta.env.VITE_API_URL;
 
 const handleAddMember = async (newMember: any) => {
   try {
-    const response = await fetch('https://accounting-app-production.up.railway.app/api/employees', {
+    const response = await fetch(`${baseUrl}/employees`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -122,7 +123,7 @@ const handleAddMember = async (newMember: any) => {
 
 const handleDeleteMember = async (id: string) => {
   try {
-    const response = await fetch(`https://accounting-app-production.up.railway.app/api/employees`, {
+    const response = await fetch(`${baseUrl}/employees`, {
       method: 'DELETE',
       credentials: 'include',
       body: JSON.stringify(id)
@@ -141,7 +142,7 @@ const handleDeleteMember = async (id: string) => {
     // Replace this with actual API PATCH call in future
     console.log("Updating member:", updatedMember);
     try {
-    const response = await fetch(`https://accounting-app-production.up.railway.app/api/employees`, {
+    const response = await fetch(`${baseUrl}/employees`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

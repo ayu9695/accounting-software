@@ -52,10 +52,11 @@ const DashboardHeader: React.FC = () => {
   };
   const navigate = useNavigate();
   const { logout } = useAuth(); // from your AuthContext
+  const baseUrl = import.meta.env.VITE_API_URL;
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("https://accounting-app-production.up.railway.app/api/logout", {
+      const res = await fetch(`${baseUrl}/logout`, {
         method: "POST",
         credentials: "include", // includes HttpOnly cookie
       });
