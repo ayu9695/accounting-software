@@ -62,11 +62,11 @@ export const ContactTabs: React.FC<ContactTabsProps> = ({
         </TabsList>
         
         <div className="flex gap-2">
-          <Button onClick={onAddCompany} variant="outline">
+          <Button onClick={onAddCompany} className="bg-accounting-blue hover:bg-accounting-blue/90">
             <Building className="mr-2 h-4 w-4" />
             Add Company
           </Button>
-          <Button onClick={onAddContact} className="bg-accounting-blue hover:bg-accounting-blue/90">
+          <Button onClick={onAddContact} variant="outline">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Contact
           </Button>
