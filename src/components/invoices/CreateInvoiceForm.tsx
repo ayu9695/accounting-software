@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, Calendar } from "lucide-react";
+import { Plus, Trash2, UserPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface LineItem {
@@ -16,6 +15,15 @@ interface LineItem {
   quantity: number;
   rate: number;
   amount: number;
+}
+
+interface Client {
+  _id: string,
+  id: string;
+  name: string;
+  email: string;
+  address?: string;
+  gstNumber?: string;
 }
 
 interface CreateInvoiceFormProps {
@@ -29,10 +37,13 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   onOpenChange,
   onCreateInvoice
 }) => {
+  // States
   const [formData, setFormData] = useState({
     clientName: "",
+    clientId: "",
     clientEmail: "",
     clientAddress: "",
+    invoiceNumber: "",
     clientGST: "",
     issueDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -50,6 +61,126 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     { id: "1", description: "", quantity: 1, rate: 0, amount: 0 }
   ]);
 
+  // New states for client management
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+  // Fetch clients from backend
+  const fetchClients = async () => {
+    setLoadingClients(true);
+    try {
+      const response = await fetch(`${baseUrl}/clients`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      const clientsData = await response.json();
+      console.log("clients fetched: ", clientsData);
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+      toast.error('Failed to load clients');
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
+  // Load clients when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchClients();
+    }
+  }, [open]);
+
+  // Filter clients for autocomplete
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return clients.slice(0, 5); // Show first 5 when no search
+    return clients.filter(client => 
+      client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+      client.email.toLowerCase().includes(clientSearch.toLowerCase())
+    ).slice(0, 5);
+  }, [clients, clientSearch]);
+
+  // Handle client selection from autocomplete
+  const handleClientSelect = (client: Client) => {
+    setFormData({
+      ...formData,
+      clientName: client.name,
+      clientId: client._id,
+      clientEmail: client.email,
+      clientAddress: client.address || "",
+      clientGST: client.gstNumber || ""
+    });
+    setClientSearch(client.name);
+    setShowClientDropdown(false);
+  };
+
+  // Handle client name input change
+  const handleClientNameChange = (value: string) => {
+    setClientSearch(value);
+    setFormData({ ...formData, clientName: value });
+    setShowClientDropdown(value.length > 0);
+    
+    // Clear other client fields if manually typing
+    if (!clients.find(c => c.name === value)) {
+      setFormData(prev => ({
+        ...prev,
+        clientName: value,
+        clientEmail: "",
+        clientAddress: "",
+        clientGST: ""
+      }));
+    }
+  };
+
+  // Add new client function
+  const addNewClient = async () => {
+    try {
+      // You can customize this based on your requirements
+      // For now, it will open a simple prompt, but you might want a proper modal
+      const clientName = prompt("Enter client name:");
+      const clientEmail = prompt("Enter client email:");
+      
+      if (!clientName || !clientEmail) {
+        toast.error("Client name and email are required");
+        return;
+      }
+
+      const newClientData = {
+        name: clientName,
+        email: clientEmail,
+        address: prompt("Enter client address (optional):") || "",
+        gstNumber: prompt("Enter GST number (optional):") || ""
+      };
+
+      const response = await fetch(`${baseUrl}/client`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(newClientData),
+      });
+
+      if (!response.ok) throw new Error('Failed to create client');
+      
+      const createdClient = await response.json();
+      
+      // Refresh clients list
+      await fetchClients();
+      
+      // Pre-fill form with new client data
+      handleClientSelect(createdClient);
+      
+      toast.success("Client created successfully!");
+    } catch (error) {
+      console.error('Error creating client:', error);
+      toast.error('Failed to create client');
+    }
+  };
+
+  // Existing line item functions (unchanged)
   const updateLineItem = (id: string, field: keyof LineItem, value: string | number) => {
     setLineItems(items => items.map(item => {
       if (item.id === id) {
@@ -80,6 +211,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     }
   };
 
+  // Calculations (unchanged)
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const discountAmount = (subtotal * formData.discount) / 100;
   const taxableAmount = subtotal - discountAmount;
@@ -89,7 +221,8 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   const totalTax = cgstAmount + sgstAmount + igstAmount;
   const total = taxableAmount + totalTax;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Updated submit handler with backend integration
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.clientName || !formData.clientEmail) {
@@ -102,28 +235,61 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       return;
     }
 
-    const invoiceData = {
-      ...formData,
-      lineItems: lineItems.map(({ id, ...item }) => item),
-      subtotal,
-      discountAmount,
-      taxableAmount,
-      cgstAmount,
-      sgstAmount,
-      igstAmount,
-      totalTax,
-      total,
-      status: "draft"
-    };
+    setSavingInvoice(true);
 
-    onCreateInvoice(invoiceData);
-    onOpenChange(false);
-    
-    // Reset form
+    try {
+      const invoiceData = {
+        ...formData,
+        lineItems: lineItems.map(({ id, ...item }) => item),
+        subtotal,
+        discountAmount,
+        taxableAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        totalTax,
+        total,
+        status: "unpaid"
+      };
+
+      // Save to backend
+      const response = await fetch(`${baseUrl}/invoices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(invoiceData),
+      });
+
+      if (!response.ok) throw new Error('Failed to save invoice');
+      
+      const savedInvoice = await response.json();
+      
+      // Call the parent handler with the saved invoice
+      onCreateInvoice(savedInvoice);
+      onOpenChange(false);
+      
+      toast.success("Invoice created successfully!");
+      
+      // Reset form
+      resetForm();
+    } catch (error) {
+      console.error('Error saving invoice:', error);
+      toast.error('Failed to save invoice');
+    } finally {
+      setSavingInvoice(false);
+    }
+  };
+
+  // Reset form helper
+  const resetForm = () => {
     setFormData({
       clientName: "",
       clientEmail: "",
+      clientId: "",
       clientAddress: "",
+      invoiceNumber: "",
       clientGST: "",
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -137,34 +303,77 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       termsAndConditions: ""
     });
     setLineItems([{ id: "1", description: "", quantity: 1, rate: 0, amount: 0 }]);
+    setClientSearch("");
+    setShowClientDropdown(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Create New Invoice</DialogTitle>
+          <DialogTitle className="text-xl font-semibold flex items-center justify-between">
+            Create New Invoice
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addNewClient}
+              className="ml-4"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add New Client
+            </Button>
+          </DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Client Information */}
+          {/* Client Information with Autocomplete */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg text-blue-700">Client Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="relative">
                   <Label htmlFor="clientName" className="text-sm font-medium">Client Name *</Label>
                   <Input
                     id="clientName"
-                    value={formData.clientName}
-                    onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                    placeholder="Enter client name"
+                    value={clientSearch}
+                    onChange={(e) => handleClientNameChange(e.target.value)}
+                    onFocus={() => setShowClientDropdown(clientSearch.length > 0)}
+                    placeholder="Start typing client name..."
                     className="mt-1"
                     required
                   />
+                  
+                  {/* Autocomplete Dropdown */}
+                  {showClientDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {loadingClients ? (
+                        <div className="p-3 text-center text-gray-500">
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          Loading clients...
+                        </div>
+                      ) : filteredClients.length > 0 ? (
+                        filteredClients.map((client) => (
+                          <div
+                            key={client.id}
+                            className="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                            onClick={() => handleClientSelect(client)}
+                          >
+                            <div className="font-medium">{client.name}</div>
+                            <div className="text-sm text-gray-500">{client.email}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-3 text-gray-500 text-center">
+                          No clients found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+                
                 <div>
                   <Label htmlFor="clientEmail" className="text-sm font-medium">Client Email *</Label>
                   <Input
@@ -202,12 +411,24 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
             </CardContent>
           </Card>
 
+          {/* Rest of the form remains the same... */}
           {/* Invoice Details */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg text-blue-700">Invoice Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                  <Label htmlFor="invoiceNumber" className="text-sm font-medium">Invoice Number</Label>
+                  <Input
+                    id="invoiceNumber"
+                    value={formData.invoiceNumber}
+                    onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="issueDate" className="text-sm font-medium">Issue Date</Label>
@@ -461,8 +682,15 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              Create Invoice
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={savingInvoice}>
+              {savingInvoice ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating Invoice...
+                </>
+              ) : (
+                'Create Invoice'
+              )}
             </Button>
           </div>
         </form>
