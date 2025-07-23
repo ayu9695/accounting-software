@@ -24,9 +24,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
 import { Building, Plus } from "lucide-react";
+import { Contact, Company} from '@/types';
 
 const Contacts = () => {
-  const { contacts, companies, addContact, addCompany } = useContacts();
+  const { contacts, companies, addContact, addCompany, updateContact } = useContacts();
   const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
   const [isAddCompanyDialogOpen, setIsAddCompanyDialogOpen] = useState(false);
 
@@ -36,6 +37,15 @@ const Contacts = () => {
   const [filteredCompanies, setFilteredCompanies] = useState(companies || []);
   const companyInputRef = useRef<HTMLInputElement>(null);
   const companyDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [isEditContactDialogOpen, setIsEditContactDialogOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [editContactData, setEditContactData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    position: "",
+  });
   
   const [newContact, setNewContact] = useState({
     name: "",
@@ -43,7 +53,6 @@ const Contacts = () => {
     phone: "",
     position: "",
     companyId: "",
-    type: "individual" as const,
     companyType: "client" as "client" | "vendor",
   });
 
@@ -133,7 +142,6 @@ const Contacts = () => {
       phone: "",
       position: "",
       companyId: "",
-      type: "individual",
       companyType: "client"
     });
     setCompanySearchValue("");
@@ -147,6 +155,7 @@ const Contacts = () => {
 
     try{
     await addContact(newContact);
+    console.log("new contact data recived: ", newContact);
     toast.success("Contact added successfully");
     resetContactForm();
     setIsAddContactDialogOpen(false);
@@ -202,6 +211,44 @@ const Contacts = () => {
   toast.error("Failed to add company");
 }
   };
+
+  // Add these functions in your Contacts component:
+const handleEditContact = (contact: Contact) => {
+  setEditingContact(contact);
+  setEditContactData({
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    position: contact.position,
+  });
+  setIsEditContactDialogOpen(true);
+};
+
+const handleUpdateContact = async () => {
+  if (!editingContact) return;
+  
+  if (!editContactData.name || !editContactData.email) {
+    toast.error("Please fill in required fields");
+    return;
+  }
+
+  try {
+    await updateContact(editingContact.id, editContactData);
+    toast.success("Contact updated successfully");
+    setIsEditContactDialogOpen(false);
+    setEditingContact(null);
+    setEditContactData({ name: "", email: "", phone: "", position: "" });
+  } catch (err) {
+    console.error('Error updating contact:', err);
+    toast.error("Failed to update contact");
+  }
+};
+
+const handleCancelEdit = () => {
+  setIsEditContactDialogOpen(false);
+  setEditingContact(null);
+  setEditContactData({ name: "", email: "", phone: "", position: "" });
+};
 
   return (
     <PageLayout title="Contacts">

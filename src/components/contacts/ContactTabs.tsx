@@ -14,7 +14,7 @@ interface Contact {
   phone: string;
   position?: string;
   companyId?: string;
-  type: 'individual' | 'company';
+  companyType?: 'client' | 'vendor' | '';
 }
 
 interface Company {

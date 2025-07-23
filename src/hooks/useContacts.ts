@@ -61,8 +61,7 @@ export const useContacts = () => {
             ? `+ ${contact.extension} ${contact.phone || ''}`
             : contact.phone || '',
             position: contact.position || '',
-            companyId: companyId,
-            type: 'individual'
+            companyId: companyId
         }))
         };
       });
@@ -80,7 +79,6 @@ export const useContacts = () => {
 
   const addContact = async (contact: Omit<Contact, 'id'>) => {
     try {
-      console.log("contact's company type is: ", contact.companyType);
     const endpoint =
       contact.companyType === 'client'
         ? `/client-contacts/${contact.companyId}`
@@ -109,12 +107,16 @@ export const useContacts = () => {
     };
 
     const newContact: Contact = {
-      ...savedContact,
-      id: savedContact.id || Date.now().toString(),
+      id: savedContact._id || Date.now().toString(),
       companyId: contact.companyId,
-      type: 'individual',
-      companyType: contact.companyType
+      companyType: contact.companyType,
+      name: contact.name, // ✅ Use original form data
+      email: contact.email, // ✅ Use original form data  
+      phone: contact.phone, // ✅ Use original form data
+      position: contact.position, // ✅ Use original form data
     };
+
+    console.log("returning contact: ", newContact);
 
     setContacts(prev => [...(prev || []), newContact]);
     return newContact;
@@ -124,11 +126,78 @@ export const useContacts = () => {
   }
   };
 
-  const updateContact = (id: string, updates: Partial<Contact>) => {
-    setContacts(prev => prev.map(contact => 
-      contact.id === id ? { ...contact, ...updates } : contact
+const updateContact = async (contactId: string, updates: Partial<Contact>) => {
+  try {
+    // Find the contact to get company info
+    const existingContact = contacts?.find(c => c.id === contactId);
+    if (!existingContact) {
+      throw new Error('Contact not found');
+    }
+
+    console.log('Updating contact:', contactId, updates);
+    
+    const endpoint = existingContact.companyType === 'client'
+      ? `/client-contacts/${existingContact.companyId}/${contactId}`
+      : `/vendor-contacts/${existingContact.companyId}/${contactId}`;
+
+    // Prepare payload with only the fields that can be updated
+    const payload = {
+      name: updates.name || existingContact.name,
+      email: updates.email || existingContact.email,
+      phone: updates.phone || existingContact.phone,
+      position: updates.position || existingContact.position
+    };
+
+    const res = await fetch(`${baseUrl}${endpoint}`, {
+      method: 'PUT', // or 'PATCH' depending on your API
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      const errorMsg = errorData?.message || 'Failed to update contact';
+      throw new Error(errorMsg);
+    }
+
+    const updatedContactResponse = await res.json();
+    console.log('Updated contact response:', updatedContactResponse);
+
+    // Create updated contact object
+    const updatedContact: Contact = {
+      ...existingContact,
+      ...updates,
+      id: contactId // Ensure ID doesn't change
+    };
+
+    // Update contacts state
+    setContacts(prev => (prev || []).map(contact => 
+      contact.id === contactId ? updatedContact : contact
     ));
-  };
+
+    // Update companies state
+    setCompanies(prev => (prev || []).map(company => 
+      company.id === existingContact.companyId 
+        ? {
+            ...company, 
+            contacts: company.contacts.map(contact => 
+              contact.id === contactId ? updatedContact : contact
+            )
+          }
+        : company
+    ));
+
+    console.log('Contact updated successfully:', updatedContact);
+    return updatedContact;
+
+  } catch (err) {
+    console.error('Error updating contact:', err);
+    throw err;
+  }
+};
 
   const deleteContact = (id: string) => {
     setContacts(prev => prev.filter(contact => contact.id !== id));
@@ -148,7 +217,7 @@ export const useContacts = () => {
     if (!res.ok) throw new Error(`Failed to add ${companyData.type}`);
     const savedCompany = await res.json();
     const newCompany: Company = {
-      id: savedCompany.id,
+      id: savedCompany._id,
       name: savedCompany.name,
       email: savedCompany.email,
       phone: savedCompany.phone || '',
@@ -159,7 +228,7 @@ export const useContacts = () => {
       pincode: savedCompany.pincode || '',
       gst: savedCompany.gst,
       panNumber: savedCompany.panNumber || '',
-      type: savedCompany.type,
+      type: companyData.type,
       contactPerson: savedCompany.contactPerson || '',
       notes: savedCompany.notes || '',
       contacts: [],
