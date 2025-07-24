@@ -313,16 +313,6 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold flex items-center justify-between">
             Create New Invoice
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addNewClient}
-              className="ml-4"
-            >
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add New Client
-            </Button>
           </DialogTitle>
         </DialogHeader>
         
