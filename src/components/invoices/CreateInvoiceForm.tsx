@@ -18,12 +18,12 @@ interface LineItem {
 }
 
 interface Client {
-  _id: string,
   id: string;
+  _id: string,
   name: string;
   email: string;
   address?: string;
-  gstNumber?: string;
+  gstin?: string;
 }
 
 interface CreateInvoiceFormProps {
@@ -40,7 +40,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   // States
   const [formData, setFormData] = useState({
     clientName: "",
-    clientId: "",
+    clientId:"",
     clientEmail: "",
     clientAddress: "",
     invoiceNumber: "",
@@ -67,6 +67,14 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
   const [savingInvoice, setSavingInvoice] = useState(false);
+  const [showAddClientDialog, setShowAddClientDialog] = useState(false);
+  const [newClientData, setNewClientData] = useState({
+    name: "",
+    email: "",
+    address: "",
+    gstin: ""
+  });
+  const [savingClient, setSavingClient] = useState(false);
   const baseUrl = import.meta.env.VITE_API_URL;
 
   // Fetch clients from backend
@@ -76,7 +84,6 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       const response = await fetch(`${baseUrl}/clients`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch clients');
       const clientsData = await response.json();
-      console.log("clients fetched: ", clientsData);
       setClients(clientsData);
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -104,14 +111,16 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
 
   // Handle client selection from autocomplete
   const handleClientSelect = (client: Client) => {
+    console.log("selecting client: ", client);
     setFormData({
       ...formData,
       clientName: client.name,
       clientId: client._id,
       clientEmail: client.email,
       clientAddress: client.address || "",
-      clientGST: client.gstNumber || ""
+      clientGST: client.gstin || ""
     });
+    console.log("setting form data: ", formData);
     setClientSearch(client.name);
     setShowClientDropdown(false);
   };
@@ -120,13 +129,13 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   const handleClientNameChange = (value: string) => {
     setClientSearch(value);
     setFormData({ ...formData, clientName: value });
-    setShowClientDropdown(value.length > 0);
     
     // Clear other client fields if manually typing
     if (!clients.find(c => c.name === value)) {
       setFormData(prev => ({
         ...prev,
         clientName: value,
+        clientId:"",
         clientEmail: "",
         clientAddress: "",
         clientGST: ""
@@ -134,32 +143,27 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     }
   };
 
+  // Handle client input focus to show dropdown
+  const handleClientInputFocus = () => {
+    setShowClientDropdown(true);
+  };
+
   // Add new client function
   const addNewClient = async () => {
+    if (!newClientData.name || !newClientData.email) {
+      toast.error("Client name and email are required");
+      return;
+    }
+
+    setSavingClient(true);
+    console.log("saving client request : ", newClientData);
     try {
-      // You can customize this based on your requirements
-      // For now, it will open a simple prompt, but you might want a proper modal
-      const clientName = prompt("Enter client name:");
-      const clientEmail = prompt("Enter client email:");
-      
-      if (!clientName || !clientEmail) {
-        toast.error("Client name and email are required");
-        return;
-      }
-
-      const newClientData = {
-        name: clientName,
-        email: clientEmail,
-        address: prompt("Enter client address (optional):") || "",
-        gstNumber: prompt("Enter GST number (optional):") || ""
-      };
-
-      const response = await fetch(`${baseUrl}/client`, {
+      const response = await fetch(`${baseUrl}/clients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+         credentials: 'include',
         body: JSON.stringify(newClientData),
       });
 
@@ -173,10 +177,16 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       // Pre-fill form with new client data
       handleClientSelect(createdClient);
       
+      // Close dialog and reset form
+      setShowAddClientDialog(false);
+      setNewClientData({ name: "", email: "", address: "", gstin: "" });
+      
       toast.success("Client created successfully!");
     } catch (error) {
       console.error('Error creating client:', error);
       toast.error('Failed to create client');
+    } finally {
+      setSavingClient(false);
     }
   };
 
@@ -258,7 +268,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+         credentials: 'include',
         body: JSON.stringify(invoiceData),
       });
 
@@ -286,11 +296,11 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   const resetForm = () => {
     setFormData({
       clientName: "",
+      clientId:"",
       clientEmail: "",
-      clientId: "",
       clientAddress: "",
-      invoiceNumber: "",
       clientGST: "",
+      invoiceNumber:"",
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       hsnCode: "",
@@ -308,13 +318,12 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold flex items-center justify-between">
-            Create New Invoice
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Create New Invoice</DialogTitle>
+          </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Client Information with Autocomplete */}
@@ -330,7 +339,8 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
                     id="clientName"
                     value={clientSearch}
                     onChange={(e) => handleClientNameChange(e.target.value)}
-                    onFocus={() => setShowClientDropdown(clientSearch.length > 0)}
+                    onFocus={handleClientInputFocus}
+                    // onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
                     placeholder="Start typing client name..."
                     className="mt-1"
                     required
@@ -339,6 +349,18 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
                   {/* Autocomplete Dropdown */}
                   {showClientDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {/* Add New Client Option */}
+                      <div
+                        className="p-3 hover:bg-blue-50 cursor-pointer border-b bg-blue-25 font-medium text-blue-700"
+                        onClick={() => {
+                          setShowAddClientDialog(true);
+                          setShowClientDropdown(false);
+                        }}
+                      >
+                        <UserPlus className="h-4 w-4 inline mr-2" />
+                        Add New Client
+                      </div>
+                      
                       {loadingClients ? (
                         <div className="p-3 text-center text-gray-500">
                           <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
@@ -347,7 +369,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
                       ) : filteredClients.length > 0 ? (
                         filteredClients.map((client) => (
                           <div
-                            key={client.id}
+                            key={client._id}
                             className="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
                             onClick={() => handleClientSelect(client)}
                           >
@@ -409,17 +431,16 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
+                <div>
                   <Label htmlFor="invoiceNumber" className="text-sm font-medium">Invoice Number</Label>
                   <Input
                     id="invoiceNumber"
                     value={formData.invoiceNumber}
                     onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+                    placeholder="Enter Invoice number"
                     className="mt-1"
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="issueDate" className="text-sm font-medium">Issue Date</Label>
                   <Input
@@ -686,5 +707,93 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Add New Client Dialog */}
+    <Dialog open={showAddClientDialog} onOpenChange={setShowAddClientDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">Add New Client</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="newClientName" className="text-sm font-medium">Client Name *</Label>
+            <Input
+              id="newClientName"
+              value={newClientData.name}
+              onChange={(e) => setNewClientData({ ...newClientData, name: e.target.value })}
+              placeholder="Enter client name"
+              className="mt-1"
+              required
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="newClientEmail" className="text-sm font-medium">Client Email *</Label>
+            <Input
+              id="newClientEmail"
+              type="email"
+              value={newClientData.email}
+              onChange={(e) => setNewClientData({ ...newClientData, email: e.target.value })}
+              placeholder="Enter client email"
+              className="mt-1"
+              required
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="newClientAddress" className="text-sm font-medium">Client Address</Label>
+            <Textarea
+              id="newClientAddress"
+              value={newClientData.address}
+              onChange={(e) => setNewClientData({ ...newClientData, address: e.target.value })}
+              placeholder="Enter client address"
+              className="mt-1"
+              rows={3}
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="newClientGST" className="text-sm font-medium">GST Number</Label>
+            <Input
+              id="newClientGST"
+              value={newClientData.gstin}
+              onChange={(e) => setNewClientData({ ...newClientData, gstin: e.target.value })}
+              placeholder="Enter GST number"
+              className="mt-1"
+            />
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => {
+              setShowAddClientDialog(false);
+              setNewClientData({ name: "", email: "", address: "", gstin: "" });
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="button" 
+            onClick={addNewClient}
+            disabled={savingClient}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {savingClient ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Adding Client...
+              </>
+            ) : (
+              'Add Client'
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 };
