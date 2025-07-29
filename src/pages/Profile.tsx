@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from '@/auth/AuthContext';
-import { Users, Plus, Edit, Trash2 } from "lucide-react";
+import { Users, Plus, Edit, Trash2, PlusCircle } from "lucide-react";
 
 interface User {
   _id: string;
@@ -48,8 +48,22 @@ const Profile = () => {
     email: '',
     role: 'team_member' as 'admin' | 'team_member',
     department: '',
-    password: ''
+    password: '',
+    address: '',
+    country: ''
   });
+
+  // Add editUser state for editing existing users
+const [editUser, setEditUser] = useState({
+  name: '',
+  email: '',
+  role: 'team_member' as 'admin' | 'team_member',
+  department: '',
+  address: '',
+  country: '',
+  isActive: true
+});
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +73,11 @@ const Profile = () => {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+    // Add these state variables to your existing useState declarations
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
   const baseUrl = import.meta.env.VITE_API_URL;
 
   // useEffect(() => {
@@ -151,27 +170,109 @@ useEffect(() => {
   };
 
   const handleAddUser = async () => {
-    if (!newUser.name || !newUser.email || !newUser.department || !newUser.password) {
-      toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
-      return;
-    }
-    try {
-      const response = await fetch(`${baseUrl}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(newUser)
-      });
-      if (!response.ok) throw new Error('Failed to create user');
-      const created = await response.json();
-      setUsers([...users, created]);
-      setNewUser({ name: '', email: '', role: 'team_member', department: '', password: '' });
-      setIsAddUserOpen(false);
-      toast({ title: 'Success', description: 'User created successfully' });
-    } catch (err) {
-      toast({ title: 'Error', description: 'Error creating user', variant: 'destructive' });
-    }
+    // if (!newUser.name || !newUser.email || !newUser.department || !newUser.password) {
+    //   toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
+    //   return;
+    // }
+    // try {
+    //   const response = await fetch(`${baseUrl}/users`, {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     credentials: 'include',
+    //     body: JSON.stringify(newUser)
+    //   });
+    //   if (!response.ok) throw new Error('Failed to create user');
+    //   const created = await response.json();
+    //   setUsers([...users, created]);
+    //   setNewUser({ name: '', email: '', role: 'team_member', department: '', password: '', country: '', address: ''});
+    //   setIsAddUserOpen(false);
+    //   toast({ title: 'Success', description: 'User created successfully' });
+    // } catch (err) {
+    //   toast({ title: 'Error', description: 'Error creating user', variant: 'destructive' });
+    // }    
+  if (!newUser.name || !newUser.email || !newUser.password) {
+    toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
+    return;
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(newUser)
+    });
+
+    if (!response.ok) throw new Error('Failed to create user');
+    
+    const created = await response.json();
+    setUsers([...users, created]);
+    setNewUser({ 
+      name: '', 
+      email: '', 
+      role: 'team_member', 
+      department: '', 
+      password: '',
+      address: '',
+      country: ''
+    });
+    setIsAddUserOpen(false);
+    toast({ title: 'Success', description: 'User created successfully' });
+  } catch (err) {
+    toast({ title: 'Error', description: 'Error creating user', variant: 'destructive' });
+  }
   };
+
+  const handleEditUser = (user: User) => {
+  setEditingUser(user);
+  setEditUser({
+    name: user.name,
+    email: user.email,
+    role: user.role === 'superadmin' ? 'admin' : user.role,
+    department: '', // You'll need to add department to your User interface
+    address: user.address || '',
+    country: user.country || '',
+    isActive: user.isActive || true
+  });
+  setIsEditUserOpen(true);
+};
+
+// Function to save edited user
+const handleSaveEditUser = async () => {
+  if (!editingUser || !editUser.name || !editUser.email) {
+    toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
+    return;
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/user/${editingUser._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        name: editUser.name,
+        email: editUser.email,
+        role: editUser.role,
+        address: editUser.address,
+        country: editUser.country,
+        isActive: editUser.isActive
+      })
+    });
+
+    if (!response.ok) throw new Error('Failed to update user');
+    
+    const updatedUser = await response.json();
+    
+    // Update the users list
+    setUsers(prev => prev.map(u => u._id === editingUser._id ? updatedUser : u));
+    
+    setIsEditUserOpen(false);
+    setEditingUser(null);
+    toast({ title: 'Success', description: 'User updated successfully' });
+  } catch (err) {
+    toast({ title: 'Error', description: 'Error updating user', variant: 'destructive' });
+  }
+};
 
   const handleSaveProfile = async () => {
     try {
@@ -295,6 +396,206 @@ useEffect(() => {
     toast({ title: 'Error', description: err.message, variant: 'destructive' });
   }
 };
+
+ const AddUserDialog = () => (
+    <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Add new user
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Add New User</DialogTitle>
+          <DialogDescription>
+            Create a new user account with the specified details.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="add-name">Full Name *</Label>
+              <Input
+                id="add-name"
+                value={newUser.name}
+                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                placeholder="Enter full name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-email">Email *</Label>
+              <Input
+                id="add-email"
+                type="email"
+                value={newUser.email}
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                placeholder="Enter email address"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="add-role">Role</Label>
+              <Select value={newUser.role} onValueChange={(value: 'admin' | 'team_member') => setNewUser({ ...newUser, role: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="team_member">Team Member</SelectItem>
+                  {canAddAdmins && <SelectItem value="admin">Admin</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="add-department">Department</Label>
+              <Input
+                id="add-department"
+                value={newUser.department}
+                onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
+                placeholder="Enter department"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="add-password">Password *</Label>
+            <Input
+              id="add-password"
+              type="password"
+              value={newUser.password}
+              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              placeholder="Enter password"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="add-address">Address</Label>
+            <Textarea
+              id="add-address"
+              value={newUser.address}
+              onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
+              placeholder="Enter address"
+              className="min-h-[80px]"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="add-country">Country</Label>
+            <Input
+              id="add-country"
+              value={newUser.country}
+              onChange={(e) => setNewUser({ ...newUser, country: e.target.value })}
+              placeholder="Enter country"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddUser}>Create User</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const EditUserDialog = () => (
+    <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Edit User</DialogTitle>
+          <DialogDescription>
+            Update user information and settings.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="edit-name">Full Name *</Label>
+              <Input
+                id="edit-name"
+                value={editUser.name}
+                onChange={(e) => setEditUser({ ...editUser, name: e.target.value })}
+                placeholder="Enter full name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-email">Email *</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editUser.email}
+                onChange={(e) => setEditUser({ ...editUser, email: e.target.value })}
+                placeholder="Enter email address"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="edit-role">Role</Label>
+              <Select value={editUser.role} onValueChange={(value: 'admin' | 'team_member') => setEditUser({ ...editUser, role: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="team_member">Team Member</SelectItem>
+                  {canAddAdmins && <SelectItem value="admin">Admin</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-department">Department</Label>
+              <Input
+                id="edit-department"
+                value={editUser.department}
+                onChange={(e) => setEditUser({ ...editUser, department: e.target.value })}
+                placeholder="Enter department"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="edit-address">Address</Label>
+            <Textarea
+              id="edit-address"
+              value={editUser.address}
+              onChange={(e) => setEditUser({ ...editUser, address: e.target.value })}
+              placeholder="Enter address"
+              className="min-h-[80px]"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="edit-country">Country</Label>
+            <Input
+              id="edit-country"
+              value={editUser.country}
+              onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
+              placeholder="Enter country"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="edit-active"
+              checked={editUser.isActive}
+              onCheckedChange={(checked) => setEditUser({ ...editUser, isActive: checked })}
+            />
+            <Label htmlFor="edit-active">Account Active</Label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsEditUserOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveEditUser}>Update User</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   if (loading) return <p>Loading settings...</p>;
   if (error || !currentUser) return <p>Error loading settings: {error}</p>;
@@ -431,8 +732,15 @@ useEffect(() => {
                       <Users className="h-5 w-5" />
                       User Management
                     </CardTitle>
-                    <CardDescription>Manage system users and their permissions</CardDescription>
+                    <CardDescription>
+                      Manage system users and their permissions
+                    </CardDescription>
                   </div>
+                  {/* <Button>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add new user
+                  </Button> */}
+                  <AddUserDialog/>
                 </div>
               </CardHeader>
               <CardContent>
@@ -491,7 +799,7 @@ useEffect(() => {
                         <TableCell>NEVER</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => handleEditUser(user)}>
                               <Edit className="h-4 w-4" />
                             </Button>
                             {user._id !== currentUser._id && (
@@ -516,6 +824,7 @@ useEffect(() => {
           </TabsContent>
           )}
       </Tabs>
+      <EditUserDialog />
     </PageLayout>
   );
 };

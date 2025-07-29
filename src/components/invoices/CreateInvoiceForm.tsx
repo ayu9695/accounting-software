@@ -18,12 +18,17 @@ interface LineItem {
 }
 
 interface Client {
-  id: string;
   _id: string,
   name: string;
   email: string;
   address?: string;
   gstin?: string;
+}
+
+interface Department {
+  _id: string;
+  tenantId: string;
+  name: string;
 }
 
 interface CreateInvoiceFormProps {
@@ -43,6 +48,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     clientId:"",
     clientEmail: "",
     clientAddress: "",
+    department: undefined,
     invoiceNumber: "",
     clientGST: "",
     issueDate: new Date().toISOString().split('T')[0],
@@ -75,7 +81,37 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     gstin: ""
   });
   const [savingClient, setSavingClient] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+  const [error, setError] = useState<string | null>(null);
+  
+  
   const baseUrl = import.meta.env.VITE_API_URL;
+
+  useEffect(() => {
+      const fetchDepartments = async () => {
+        try{
+        const res = await fetch(`${baseUrl}/departments`, {
+          credentials: 'include'
+        });
+  
+        if(!res.ok) {
+          const errortext = await res.text();
+          throw new Error(`Error ${res.status}: ${errortext}`);
+        }
+        const data: Department[] = await res.json();
+        console.log("fetched departements: ", data);
+        setDepartments(data);
+      } catch(err: any){
+        console.error('Faied to fetch departments:', err);
+        setError(err.message);
+      }
+      // finally{
+      //   setLoading(false);
+      // }
+      };
+      fetchDepartments();
+    }, []);
 
   // Fetch clients from backend
   const fetchClients = async () => {
@@ -120,6 +156,9 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       clientAddress: client.address || "",
       clientGST: client.gstin || ""
     });
+    if (!formData.department) {
+      delete formData.department;
+    }
     console.log("setting form data: ", formData);
     setClientSearch(client.name);
     setShowClientDropdown(false);
@@ -300,6 +339,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       clientEmail: "",
       clientAddress: "",
       clientGST: "",
+      department: "",
       invoiceNumber:"",
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -407,6 +447,21 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
                     placeholder="Enter GST number"
                     className="mt-1"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="add-department">Department</Label>
+                  <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept._id} value={dept._id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>

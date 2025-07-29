@@ -16,7 +16,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { User } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { User, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // Create a context to share settings across the app
@@ -128,27 +129,36 @@ const Settings = () => {
   }>;
 }
 
-  const [settings, setSettings] = useState<Settings | null>(null);
+interface Department {
+  _id: string;
+  tenantId: string;
+  name: string;
+  description: string;
+}
+
+  const [settings, setSettings] = useState<Settings | null>();
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [newDepartment, setNewDepartment] = useState({ name: '', description: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
 
   // Load settings from localStorage on component mount
-  useEffect(() => {
-    const savedCompanySettings = localStorage.getItem("companySettings");
-    const savedEmailSettings = localStorage.getItem("emailSettings");
-    const savedTaxSettings = localStorage.getItem("taxSettings");
+  // useEffect(() => {
+  //   const savedCompanySettings = localStorage.getItem("companySettings");
+  //   const savedEmailSettings = localStorage.getItem("emailSettings");
+  //   const savedTaxSettings = localStorage.getItem("taxSettings");
     
-    if (savedCompanySettings) {
-      setCompanySettings(JSON.parse(savedCompanySettings));
-    }
-    if (savedEmailSettings) {
-      setEmailSettings(JSON.parse(savedEmailSettings));
-    }
-    if (savedTaxSettings) {
-      setTaxSettings(JSON.parse(savedTaxSettings));
-    }
-  }, []);
+  //   if (savedCompanySettings) {
+  //     setCompanySettings(JSON.parse(savedCompanySettings));
+  //   }
+  //   if (savedEmailSettings) {
+  //     setEmailSettings(JSON.parse(savedEmailSettings));
+  //   }
+  //   if (savedTaxSettings) {
+  //     setTaxSettings(JSON.parse(savedTaxSettings));
+  //   }
+  // }, []);
   const baseUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
@@ -176,6 +186,95 @@ const Settings = () => {
 
     fetchSettings();
   }, []);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try{
+      const res = await fetch(`${baseUrl}/departments`, {
+        credentials: 'include'
+      });
+
+      if(!res.ok) {
+        const errortext = await res.text();
+        throw new Error(`Error ${res.status}: ${errortext}`);
+      }
+      const data: Department[] = await res.json();
+      console.log("fetched departements: ", data);
+      setDepartments(data);
+    } catch(err: any){
+      console.error('Faied to fetch departments:', err);
+      setError(err.message);
+    }
+    // finally{
+    //   setLoading(false);
+    // }
+    };
+    fetchDepartments();
+  }, []);
+
+  const handleAddDepartment = async () => {
+  if (!newDepartment.name.trim()) {
+    toast({ title: "Error", description: "Department name is required", variant: "destructive" });
+    return;
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/departments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        name: newDepartment.name,
+        description: newDepartment.description
+      })
+    });
+
+    if (!response.ok) throw new Error('Failed to create department');
+    
+    const createdDept: Department = await response.json();
+    setDepartments([...departments, createdDept]);
+    setNewDepartment({ name: '', description: '' });
+    toast({ title: 'Success', description: 'Department created successfully' });
+  } catch (err) {
+    toast({ title: 'Error', description: 'Failed to create department', variant: 'destructive' });
+  }
+};
+
+const handleUpdateDepartment = async (deptId: string, updatedData: Partial<Department>) => {
+  try {
+    const response = await fetch(`${baseUrl}/departments/${deptId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(updatedData)
+    });
+
+    if (!response.ok) throw new Error('Failed to update department');
+    
+    const updatedDept: Department = await response.json();
+    setDepartments(prev => prev.map(dept => dept._id === deptId ? updatedDept : dept));
+    toast({ title: 'Success', description: 'Department updated successfully' });
+  } catch (err) {
+    toast({ title: 'Error', description: 'Failed to update department', variant: 'destructive' });
+  }
+};
+
+// Function to delete department
+const handleDeleteDepartment = async (deptId: string) => {
+  try {
+    const response = await fetch(`${baseUrl}/departments/${deptId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    if (!response.ok) throw new Error('Failed to delete department');
+    
+    setDepartments(prev => prev.filter(dept => dept._id !== deptId));
+    toast({ title: 'Success', description: 'Department deleted successfully' });
+  } catch (err) {
+    toast({ title: 'Error', description: 'Failed to delete department', variant: 'destructive' });
+  }
+};
 
   if (loading) return <p>Loading settings...</p>;
   if (error) return <p>Error loading settings: {error}</p>;
@@ -219,12 +318,12 @@ const Settings = () => {
             >
               Departments
             </TabsTrigger>
-            <TabsTrigger 
+            {/* <TabsTrigger 
               value="security"
               className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accounting-blue pb-2 pt-2"
             >
               Security
-            </TabsTrigger>
+            </TabsTrigger> */}
           </TabsList>
         
           <TabsContent value="company">
@@ -236,9 +335,9 @@ const Settings = () => {
               <CardContent className="space-y-6">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-20 w-20">
-                    <AvatarImage src={companySettings.logo || ""} alt="Company Logo" />
+                    <AvatarImage src='' alt="Company Logo" />
                     <AvatarFallback className="text-xl">
-                      {companySettings.name.substring(0, 2).toUpperCase()}
+                      Fallback
                     </AvatarFallback>
                   </Avatar>
                   <Button variant="outline">Upload Logo</Button>
@@ -252,7 +351,7 @@ const Settings = () => {
                     <Input 
                       id="companyName" 
                       value={settings.name}
-                      onChange={(e) => setCompanySettings({...companySettings, name: e.target.value})}
+                      // onChange={(e) => setCompanySettings({...companySettings, name: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -261,7 +360,7 @@ const Settings = () => {
                       id="companyEmail" 
                       type="email"
                       value={settings.email}
-                      onChange={(e) => setCompanySettings({...companySettings, email: e.target.value})}
+                      // onChange={(e) => setCompanySettings({...companySettings, email: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -269,7 +368,7 @@ const Settings = () => {
                     <Input 
                       id="companyPhone" 
                       value={settings.phone}
-                      onChange={(e) => setCompanySettings({...companySettings, phone: e.target.value})}
+                      // onChange={(e) => setCompanySettings({...companySettings, phone: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -277,7 +376,7 @@ const Settings = () => {
                     <Input 
                       id="taxId" 
                       value={settings.gstNumber}
-                      onChange={(e) => setCompanySettings({...companySettings, taxId: e.target.value})}
+                      // onChange={(e) => setCompanySettings({...companySettings, taxId: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
@@ -285,14 +384,14 @@ const Settings = () => {
                     <Input 
                       id="address" 
                       value={settings.address}
-                      onChange={(e) => setCompanySettings({...companySettings, address: e.target.value})}
+                      // onChange={(e) => setCompanySettings({...companySettings, address: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Default Currency</Label>
                     <Select
                       value={companySettings.currency}
-                      onValueChange={(value) => setCompanySettings({...companySettings, currency: value})}
+                      // onValueChange={(value) => setCompanySettings({...companySettings, currency: value})}
                     >
                       <SelectTrigger id="currency">
                         <SelectValue placeholder="Select currency" />
@@ -416,7 +515,7 @@ const Settings = () => {
                     <Label htmlFor="gstRate">Default GST Rate (%)</Label>
                     <Input 
                       id="gstRate" 
-                      value={settings.defaultTaxRates.cgst}
+                      value={settings.defaultTaxRates.cgst + settings.defaultTaxRates.sgst}
                       onChange={(e) => setTaxSettings({...taxSettings, gstRate: e.target.value})}
                     />
                   </div>
@@ -520,40 +619,84 @@ const Settings = () => {
                 <div className="space-y-4">
                   <h3 className="font-medium">Departments</h3>
                   <div className="border rounded-md p-4 space-y-4">
-                    {companySettings.departments.map((dept, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <Input 
-                          value={dept}
-                          onChange={(e) => {
-                            const updatedDepts = [...companySettings.departments];
-                            updatedDepts[index] = e.target.value;
-                            setCompanySettings({...companySettings, departments: updatedDepts});
-                          }}
-                        />
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-red-500 ml-2"
-                          onClick={() => {
-                            const updatedDepts = companySettings.departments.filter((_, i) => i !== index);
-                            setCompanySettings({...companySettings, departments: updatedDepts});
-                          }}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        setCompanySettings({
-                          ...companySettings, 
-                          departments: [...companySettings.departments, "New Department"]
-                        });
-                      }}
-                    >
-                      Add Department
-                    </Button>
+                    {/* Existing Departments */}
+      {departments.map((dept) => (
+        <div key={dept._id} className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 mr-4">
+              <Input 
+                value={dept.name}
+                placeholder="Department name"
+                onChange={(e) => {
+                  const updatedName = e.target.value;
+                  setDepartments(prev => 
+                    prev.map(d => d._id === dept._id ? { ...d, name: updatedName } : d)
+                  );
+                }}
+                onBlur={() => {
+                  if (dept._id) {
+                    handleUpdateDepartment(dept._id, { name: dept.name });
+                  }
+                }}
+              />
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-red-500"
+              onClick={() => {
+                if (dept._id) {
+                  handleDeleteDepartment(dept._id);
+                }
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+          <Textarea
+            value={dept.description}
+            placeholder="Department description"
+            className="min-h-[60px]"
+            onChange={(e) => {
+              const updatedDescription = e.target.value;
+              setDepartments(prev => 
+                prev.map(d => d._id === dept._id ? { ...d, description: updatedDescription } : d)
+              );
+            }}
+            onBlur={() => {
+              if (dept._id) {
+                handleUpdateDepartment(dept._id, { description: dept.description });
+              }
+            }}
+          />
+        </div>
+      ))}
+      
+      {/* Add New Department Form */}
+      <div className="border-t pt-4 mt-4">
+        <h4 className="font-medium mb-2">Add New Department</h4>
+        <div className="space-y-2">
+          <Input
+            value={newDepartment.name}
+            placeholder="Department name"
+            onChange={(e) => setNewDepartment({ ...newDepartment, name: e.target.value })}
+          />
+          <Textarea
+            value={newDepartment.description}
+            placeholder="Department description"
+            className="min-h-[60px]"
+            onChange={(e) => setNewDepartment({ ...newDepartment, description: e.target.value })}
+          />
+          <Button 
+            variant="outline" 
+            onClick={handleAddDepartment}
+            className="w-full"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Department
+          </Button>
+        </div>
+      </div>    
                   </div>
                 </div>
 
