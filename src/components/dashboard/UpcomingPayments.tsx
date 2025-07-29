@@ -65,7 +65,7 @@ const UpcomingPayments: React.FC = () => {
               <TableHead className="text-right">Days Left</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          {/* <TableBody>
             {payments.map((payment) => (
               <TableRow key={payment.id}>
                 <TableCell className="font-medium">{payment.name}</TableCell>
@@ -86,7 +86,8 @@ const UpcomingPayments: React.FC = () => {
                 </TableCell>
               </TableRow>
             ))}
-          </TableBody>
+          </TableBody> */}
+          COMING SOON
         </Table>
       </CardContent>
     </Card>

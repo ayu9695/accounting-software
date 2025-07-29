@@ -19,6 +19,9 @@ import { toast } from "sonner";
 export interface Invoice {
   _id: string;
   tenantId: string;
+  invoiceNumber: string;
+  clientName: string;
+  issueDate: string;
   subtotal: number;
   discount: number;
   taxAmount: number;
@@ -51,6 +54,7 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const totalAmount = invoices.reduce((sum, i) => sum + i.total, 0);
+  const amount = '₹ '+ totalAmount.toFixed(2);
   console.log("total amount is: ", totalAmount);  
 
   return (
@@ -68,25 +72,25 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
               <StatCard
                 title="Total Revenue"
-                value={totalAmount.toFixed(2)}
+                value={amount}
                 icon={<BanknoteIcon size={24} />}
                 // trend={{ value: 12.5, isPositive: true }}
               />
               <StatCard
                 title="Total Expenses"
-                value="$18,230.00"
+                value="Coming Soon"
                 icon={<ShoppingBagIcon size={24} />}
-                trend={{ value: 3.2, isPositive: false }}
+                // trend={{ value: 3.2, isPositive: false }}
               />
               <StatCard
                 title="Net Profit"
-                value="$6,550.00"
+                value="Coming Soon"
                 icon={<TrendingUpIcon size={24} />}
                 trend={{ value: 8.7, isPositive: true }}
               />
               <StatCard
                 title="Tax Liability"
-                value="$2,980.00"
+                value="Coming Soon"
                 icon={<ReceiptCentIcon size={24} />}
                 trend={{ value: 5.3, isPositive: false }}
               />
@@ -94,11 +98,11 @@ const Dashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
               <RevenueChart />
-              <InvoiceStatusChart />
+              <InvoiceStatusChart invoices={invoices} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <RecentInvoices />
+              <RecentInvoices invoices={invoices}/>
               <UpcomingPayments />
             </div>
           </div>

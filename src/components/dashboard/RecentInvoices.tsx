@@ -8,43 +8,57 @@ import { ArrowRightIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface Invoice {
-  id: string;
-  client: string;
-  amount: string;
-  date: string;
-  status: "paid" | "unpaid" | "partial";
+  // id: string;
+  // client: string;
+  // amount: string;
+  // date: string;
+  // status: "paid" | "unpaid" | "partial";
+    _id: string;
+  tenantId: string;
+  invoiceNumber: string;
+  clientName: string;
+  issueDate: string;
+  subtotal: number;
+  discount: number;
+  taxAmount: number;
+  total: number;
+  status: 'paid' | 'unpaid' | 'partial' | 'overdue';
 }
 
-const invoices: Invoice[] = [
-  {
-    id: "INV-001",
-    client: "Acme Inc.",
-    amount: "$1,200.00",
-    date: "2025-04-01",
-    status: "paid",
-  },
-  {
-    id: "INV-002",
-    client: "Globex Corp",
-    amount: "$3,400.00",
-    date: "2025-04-05",
-    status: "unpaid",
-  },
-  {
-    id: "INV-003",
-    client: "Wayne Enterprises",
-    amount: "$2,800.00",
-    date: "2025-04-07",
-    status: "partial",
-  },
-  {
-    id: "INV-004",
-    client: "Stark Industries",
-    amount: "$5,600.00",
-    date: "2025-04-10",
-    status: "paid",
-  },
-];
+interface RecentInvoicesProps {
+  invoices: Invoice[];
+}
+
+// const invoices: Invoice[] = [
+//   {
+//     id: "INV-001",
+//     client: "Acme Inc.",
+//     amount: "$1,200.00",
+//     date: "2025-04-01",
+//     status: "paid",
+//   },
+//   {
+//     id: "INV-002",
+//     client: "Globex Corp",
+//     amount: "$3,400.00",
+//     date: "2025-04-05",
+//     status: "unpaid",
+//   },
+//   {
+//     id: "INV-003",
+//     client: "Wayne Enterprises",
+//     amount: "$2,800.00",
+//     date: "2025-04-07",
+//     status: "partial",
+//   },
+//   {
+//     id: "INV-004",
+//     client: "Stark Industries",
+//     amount: "$5,600.00",
+//     date: "2025-04-10",
+//     status: "paid",
+//   },
+// ];
 
 const getStatusColor = (status: Invoice["status"]) => {
   switch (status) {
@@ -68,7 +82,7 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const RecentInvoices: React.FC = () => {
+const RecentInvoices: React.FC<RecentInvoicesProps> = ({ invoices }) => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -82,19 +96,19 @@ const RecentInvoices: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {invoices.map((invoice) => (
+          {invoices.slice(0, 4).map((invoice) => (
             <div
-              key={invoice.id}
+              key={invoice._id}
               className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
             >
               <div className="grid gap-1">
-                <div className="font-medium">{invoice.client}</div>
+                <div className="font-medium">{invoice.clientName}</div>
                 <div className="text-sm text-muted-foreground">
-                  {invoice.id} • {formatDate(invoice.date)}
+                  {invoice.invoiceNumber} • {formatDate(invoice.issueDate)}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="font-medium">{invoice.amount}</div>
+                <div className="font-medium">{invoice.total}</div>
                 <Badge
                   className={cn(
                     "capitalize",

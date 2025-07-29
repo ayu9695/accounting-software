@@ -34,7 +34,7 @@ const RevenueChart: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          {/* <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -68,7 +68,8 @@ const RevenueChart: React.FC = () => {
                 fill="url(#colorExpenses)"
               />
             </AreaChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer> */}
+          COMING SOON
         </div>
       </CardContent>
     </Card>
