@@ -1,99 +1,78 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { VendorBill, Vendor } from '@/types';
 import { useSmartFilters } from './useSmartFilters';
-
-// Mock data for vendors
-const mockVendors: Vendor[] = [
-  {
-    id: "1",
-    name: "Tech Solutions Pvt Ltd",
-    gstin: "29ABCDE1234F1Z5",
-    address: "123 Tech Park, Electronic City",
-    city: "Bangalore",
-    state: "Karnataka",
-    pincode: "560100",
-    email: "billing@techsolutions.com",
-    phone: "+91 9876543210",
-    panNumber: "ABCDE1234F"
-  },
-  {
-    id: "2",
-    name: "Office Supplies Co",
-    gstin: "27FGHIJ5678K2A6",
-    address: "456 Business District",
-    city: "Mumbai",
-    state: "Maharashtra", 
-    pincode: "400001",
-    email: "accounts@officesupplies.com",
-    phone: "+91 9876543211"
-  },
-  {
-    id: "3",
-    name: "Digital Marketing Agency",
-    gstin: "06KLMNO9012L3B7",
-    address: "789 Corporate Avenue",
-    city: "Delhi",
-    state: "Delhi",
-    pincode: "110001",
-    email: "finance@digitalmarketing.com",
-    phone: "+91 9876543212"
-  }
-];
-
-// Mock data for vendor bills with payment tracking
-const mockVendorBills: VendorBill[] = [
-  {
-    id: "1",
-    vendorId: "1",
-    vendorName: "Tech Solutions Pvt Ltd",
-    billNumber: "TS/2024/001",
-    billDate: "2025-05-20",
-    uploadDate: "2025-05-20",
-    totalAmount: 50000,
-    taxableAmount: 42373,
-    cgst: 3814,
-    sgst: 3814,
-    igst: 0,
-    tdsRate: 2,
-    tdsAmount: 1000,
-    payableAmount: 49000,
-    status: 'paid',
-    category: 'Services',
-    description: 'Software development services',
-    fileName: 'tech-solutions-invoice.pdf',
-    paymentDate: '2025-05-22',
-    paymentMethod: 'bank_transfer',
-    paymentReference: 'TXN123456789'
-  },
-  {
-    id: "2",
-    vendorId: "2", 
-    vendorName: "Office Supplies Co",
-    billNumber: "OS/2024/045",
-    billDate: "2025-05-18",
-    uploadDate: "2025-05-18",
-    totalAmount: 15000,
-    taxableAmount: 12712,
-    cgst: 1144,
-    sgst: 1144,
-    igst: 0,
-    tdsRate: 1,
-    tdsAmount: 150,
-    payableAmount: 14850,
-    status: 'verified',
-    category: 'Goods',
-    description: 'Office stationery and supplies',
-    fileName: 'office-supplies-bill.pdf',
-    verifiedDate: '2025-05-19',
-    verifiedBy: 'Finance Manager'
-  }
-];
+import { toast } from "sonner";
 
 export const useVendorBills = () => {
-  const [vendorBills, setVendorBills] = useState<VendorBill[]>(mockVendorBills);
-  const [vendors] = useState<Vendor[]>(mockVendors);
+  const [vendorBills, setVendorBills] = useState<VendorBill[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+
+  const baseUrl = import.meta.env.VITE_API_URL; 
+
+ // Fetch vendors from backend
+  const fetchVendors = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendors`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setVendors(data.vendors || data);
+      console.log("Fetched vendors: ", data);
+    } catch (error) {
+      console.error("Error fetching vendors:", error);
+      setError("Failed to load vendors");
+      toast.error("Failed to load vendors");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Fetch vendor bills from backend
+  const fetchVendorBills = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendor-bills`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setVendorBills(data.vendorBills || data);
+      console.log("Fetched vendor bills: ", data);
+      console.log("Saved vendor bills: ", vendorBills);
+    } catch (error) {
+      console.error("Error fetching vendor bills:", error);
+      setError("Failed to load vendor bills");
+      toast.error("Failed to load vendor bills");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initialize data on component mount
+  useEffect(() => {
+    fetchVendors();
+    fetchVendorBills();
+  }, []);
+
 
   const {
     filters,
@@ -109,24 +88,127 @@ export const useVendorBills = () => {
     sortOrder: 'desc'
   });
 
-  const createVendorBill = (bill: Omit<VendorBill, 'id' | 'uploadDate'>) => {
-    const newBill: VendorBill = {
-      ...bill,
-      id: Date.now().toString(),
-      uploadDate: new Date().toISOString().split('T')[0]
-    };
-    setVendorBills(prev => [newBill, ...prev]);
-    return newBill;
+  
+  // Create new vendor bill
+  const createVendorBill = async (billData: Omit<VendorBill, 'id' | 'uploadDate'>) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendor-bills`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(billData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const newBill = await response.json();
+      setVendorBills(prev => [newBill.vendorBill || newBill, ...prev]);
+      toast.success("Vendor bill created successfully");
+      return newBill.vendorBill || newBill;
+    } catch (error) {
+      console.error("Error creating vendor bill:", error);
+      toast.error("Failed to create vendor bill");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateVendorBill = (id: string, updates: Partial<VendorBill>) => {
-    setVendorBills(prev => prev.map(bill => 
-      bill.id === id ? { ...bill, ...updates } : bill
-    ));
+  // Update vendor bill
+  const updateVendorBill = async (id: string, updates: Partial<VendorBill>) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendor-bills/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const updatedBill = await response.json();
+      setVendorBills(prev => prev.map(bill => 
+        bill._id === id ? { ...bill, ...updatedBill.vendorBill || updatedBill } : bill
+      ));
+      toast.success("Vendor bill updated successfully");
+      return updatedBill.vendorBill || updatedBill;
+    } catch (error) {
+      console.error("Error updating vendor bill:", error);
+      toast.error("Failed to update vendor bill");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteVendorBill = (id: string) => {
-    setVendorBills(prev => prev.filter(bill => bill.id !== id));
+  // Delete vendor bill
+  const deleteVendorBill = async (id: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendor-bills/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      setVendorBills(prev => prev.filter(bill => bill._id !== id));
+      toast.success("Vendor bill deleted successfully");
+    } catch (error) {
+      console.error("Error deleting vendor bill:", error);
+      toast.error("Failed to delete vendor bill");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get vendor bill by ID
+  const getVendorBillById = async (id: string) => {
+    console.log("id value: ", id );
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendor-bills/${id}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const bill = await response.json();
+      return bill.vendorBill || bill;
+    } catch (error) {
+      console.error("Error fetching vendor bill:", error);
+      toast.error("Failed to load vendor bill");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh data
+  const refreshData = () => {
+    fetchVendors();
+    fetchVendorBills();
   };
 
   // Calculate summary statistics
@@ -140,6 +222,7 @@ export const useVendorBills = () => {
     allVendorBills: vendorBills,
     vendors,
     loading,
+    error,
     filters,
     updateFilters,
     clearFilters,
@@ -149,6 +232,8 @@ export const useVendorBills = () => {
     createVendorBill,
     updateVendorBill,
     deleteVendorBill,
+    getVendorBillById,
+    refreshData,
     summary: {
       totalAmount,
       totalTDS,

@@ -12,10 +12,16 @@ import { Upload, Calculator, Plus } from "lucide-react";
 import { VendorBill, Vendor } from "@/types";
 
 interface VendorBillFormProps {
+  // open: boolean;
+  // onOpenChange: (open: boolean) => void;
+  // onSubmit: (bill: Omit<VendorBill, 'id' | 'uploadDate'>) => void;
+  // vendors: Vendor[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (bill: Omit<VendorBill, 'id' | 'uploadDate'>) => void;
+  onSubmit: (data: any) => void;
   vendors: Vendor[];
+  initialData?: any; // <-- Add this
+  mode?: "add" | "edit"; // <-- Add this if you're distinguishing between modes
 }
 
 export const VendorBillForm: React.FC<VendorBillFormProps> = ({
@@ -34,7 +40,7 @@ export const VendorBillForm: React.FC<VendorBillFormProps> = ({
     sgst: "",
     igst: "",
     tdsRate: "2",
-    category: "",
+    department: "",
     description: "",
     fileName: "",
     file: null as File | null,
@@ -65,7 +71,7 @@ export const VendorBillForm: React.FC<VendorBillFormProps> = ({
   };
 
   const handleVendorChange = (vendorId: string) => {
-    const vendor = vendors.find(v => v.id === vendorId);
+    const vendor = vendors.find(v => v._id === vendorId);
     setFormData({
       ...formData,
       vendorId,
@@ -96,13 +102,13 @@ export const VendorBillForm: React.FC<VendorBillFormProps> = ({
       return;
     }
 
-    const bill: Omit<VendorBill, 'id' | 'uploadDate'> = {
+    const bill: Omit<VendorBill, '_id' | 'uploadDate'> = {
       vendorId: formData.vendorId,
       vendorName: formData.vendorName,
       billNumber: formData.billNumber,
       billDate: formData.billDate,
       totalAmount: calculatedAmounts.grossAmount,
-      taxableAmount: parseFloat(formData.taxableAmount),
+      amount: parseFloat(formData.taxableAmount),
       cgst: parseFloat(formData.cgst) || 0,
       sgst: parseFloat(formData.sgst) || 0,
       igst: parseFloat(formData.igst) || 0,
@@ -110,7 +116,7 @@ export const VendorBillForm: React.FC<VendorBillFormProps> = ({
       tdsAmount: calculatedAmounts.tdsAmount,
       payableAmount: calculatedAmounts.netPayable,
       status: 'pending',
-      category: formData.category,
+      department: formData.department,
       description: formData.description,
       fileName: formData.fileName,
       fileUrl: formData.file ? URL.createObjectURL(formData.file) : undefined
@@ -130,7 +136,7 @@ export const VendorBillForm: React.FC<VendorBillFormProps> = ({
       sgst: "",
       igst: "",
       tdsRate: "2",
-      category: "",
+      department: "",
       description: "",
       fileName: "",
       file: null,
@@ -158,7 +164,7 @@ export const VendorBillForm: React.FC<VendorBillFormProps> = ({
               </SelectTrigger>
               <SelectContent>
                 {vendors.map((vendor) => (
-                  <SelectItem key={vendor.id} value={vendor.id}>
+                  <SelectItem key={vendor._id} value={vendor._id}>
                     {vendor.name}
                   </SelectItem>
                 ))}
@@ -189,10 +195,10 @@ export const VendorBillForm: React.FC<VendorBillFormProps> = ({
           </div>
           
           <div>
-            <Label htmlFor="category">Category</Label>
-            <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+            <Label htmlFor="department">Department</Label>
+            <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
               <SelectTrigger>
-                <SelectValue placeholder="Select category" />
+                <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Services">Services</SelectItem>

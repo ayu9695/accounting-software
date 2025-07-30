@@ -194,14 +194,15 @@ export interface PaginationData {
 }
 
 export interface VendorBill {
-  id: string;
+  _id:string;
   vendorId: string;
   vendorName: string;
+  department: string;
   billNumber: string;
   billDate: string;
   uploadDate: string;
   totalAmount: number;
-  taxableAmount: number;
+  amount: number;
   cgst: number;
   sgst: number;
   igst: number;
@@ -209,7 +210,6 @@ export interface VendorBill {
   tdsAmount: number;
   payableAmount: number;
   status: 'pending' | 'verified' | 'paid';
-  category: string;
   description?: string;
   fileName?: string;
   fileUrl?: string;
@@ -221,7 +221,7 @@ export interface VendorBill {
 }
 
 export interface Vendor {
-  id: string;
+  _id: string;
   name: string;
   gstin: string;
   address: string;
