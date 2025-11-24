@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PageLayout from "@/components/PageLayout";
 import {
   Card,
@@ -70,6 +70,7 @@ const VendorBills: React.FC = () => {
     filteredResults,
     createVendorBill,
     updateVendorBill,
+    updateVendorPayment,
     deleteVendorBill,
     getVendorBillById,
     refreshData,
@@ -93,13 +94,17 @@ const VendorBills: React.FC = () => {
     billNumber: "",
     amount: 0,
   });
+  const [openEditAfterSelect, setOpenEditAfterSelect] = useState(false);
+
 
   const handlePayment = async (paymentData: any) => {
     try {
-      await updateVendorBill(paymentDialog.billId, {
-        status: "paid",
-        paymentDate: paymentData.paymentDate,
+      console.log("paid maount is : ", paymentData);
+      await updateVendorPayment(paymentDialog.billId, {
+        paymentStatus: "paid",
+        // paymentDate: paymentData.paymentDate,
         paymentMethod: paymentData.paymentMethod,
+        paidAmount: paymentData.amount,
         paymentReference: paymentData.reference,
       });
 
@@ -158,7 +163,8 @@ const VendorBills: React.FC = () => {
     try {
       const bill = await getVendorBillById(billId);
       setSelectedBill(bill);
-      setIsEditBillOpen(true);
+      // setIsEditBillOpen(true);
+      setOpenEditAfterSelect(true);
     } catch (error) {
       toast({
         title: "Error",
@@ -167,6 +173,13 @@ const VendorBills: React.FC = () => {
       });
     }
   };
+
+  useEffect(() => {
+  if (openEditAfterSelect && selectedBill) {
+    setIsEditBillOpen(true);
+    setOpenEditAfterSelect(false);
+  }
+}, [openEditAfterSelect, selectedBill]);
 
   const handleDeleteBill = async () => {
     try {
@@ -244,7 +257,7 @@ const VendorBills: React.FC = () => {
 
           <Card className="bg-green-50 border-green-200">
             <CardHeader>
-              <CardTitle className="text-sm text-green-800">Payable Amount</CardTitle>
+              <CardTitle className="text-sm text-green-800">Pending Amount</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">₹{summary.totalPayable.toLocaleString()}</div>
@@ -254,7 +267,7 @@ const VendorBills: React.FC = () => {
 
           <Card className="bg-purple-50 border-purple-200">
             <CardHeader>
-              <CardTitle className="text-sm text-purple-800">Total TDS</CardTitle>
+              <CardTitle className="text-sm text-purple-800">Total Paid</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">₹{summary.totalTDS.toLocaleString()}</div>
@@ -323,10 +336,10 @@ const VendorBills: React.FC = () => {
                         <TableHead>Bill</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right">TDS</TableHead>
+                        <TableHead>Amount</TableHead>
                         <TableHead className="text-right">Payable</TableHead>
+                        <TableHead className="text-right">TDS</TableHead>
+                        <TableHead className="text-right">Pending</TableHead>
                         <TableHead>Paid On</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="w-32">Actions</TableHead>
@@ -341,14 +354,15 @@ const VendorBills: React.FC = () => {
                           </TableCell>
                           <TableCell>{bill.vendorName}</TableCell>
                           <TableCell>{formatDate(bill.billDate)}</TableCell>
-                          <TableCell>{bill.department}</TableCell>
-                          <TableCell className="text-right">₹{bill.totalAmount.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">₹{bill.tdsAmount} ({bill.tdsRate}%)</TableCell>
-                          <TableCell className="text-right">₹{bill.payableAmount.toLocaleString()}</TableCell>
-                          <TableCell>{bill.paymentDate ? formatDate(bill.paymentDate) : '-'}</TableCell>
+                          <TableCell>₹ {bill.totalAmount}</TableCell>
+                          <TableCell className="text-right">₹ {bill.payableAmount.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">₹ {bill.tdsAmount} ({bill.tdsRate}%)</TableCell>
+                          <TableCell className="text-right">₹ {bill.pendingAmount}</TableCell>
+                          {/* <TableCell>{bill.paymentDate ? formatDate(bill.paymentDate) : '-'}</TableCell> */}
+                          <TableCell>{bill.paymentDate ? bill.paymentDate.toString() : '-'}</TableCell>
                           <TableCell>
-                            <Badge className={getStatusBadge(bill.status)}>
-                              {bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}
+                            <Badge className={getStatusBadge(bill.paymentStatus)}>
+                              {bill.paymentStatus}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -389,7 +403,7 @@ const VendorBills: React.FC = () => {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                              {bill.status === 'pending' && (
+                              {/* {bill.status === 'pending' && (
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
@@ -399,8 +413,8 @@ const VendorBills: React.FC = () => {
                                 >
                                   <CheckCircle className="h-4 w-4" />
                                 </Button>
-                              )}
-                              {bill.status === 'verified' && (
+                              )} */}
+                              {/* {bill.status === 'verified' && ( */}
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
@@ -415,7 +429,7 @@ const VendorBills: React.FC = () => {
                                 >
                                   <CreditCard className="h-4 w-4" />
                                 </Button>
-                              )}
+                              {/* )} */}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -460,6 +474,7 @@ const VendorBills: React.FC = () => {
 
         {/* Edit Bill Dialog */}
         <VendorBillForm 
+          key={selectedBill?._id ?? "edit-form"} 
           open={isEditBillOpen} 
           onOpenChange={setIsEditBillOpen} 
           onSubmit={handleUpdateBill} 
@@ -487,8 +502,8 @@ const VendorBills: React.FC = () => {
                   <div>
                     <label className="text-sm font-medium">Status</label>
                     <div className="mt-1">
-                      <Badge className={getStatusBadge(selectedBill.status)}>
-                        {selectedBill.status.charAt(0).toUpperCase() + selectedBill.status.slice(1)}
+                      <Badge className={getStatusBadge(selectedBill.paymentStatus)}>
+                        {selectedBill.paymentStatus.charAt(0).toUpperCase() + selectedBill.paymentStatus.slice(1)}
                       </Badge>
                     </div>
                   </div>

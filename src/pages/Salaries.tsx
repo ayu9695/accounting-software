@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { SalaryPaymentTable } from "@/components/salaries/SalaryPaymentTable";
 import { BulkSalaryDialog } from "@/components/salaries/BulkSalaryDialog";
 import { useEmployees } from "@/hooks/useEmployees";
 import { Link } from "react-router-dom";
+import { Toast } from "@radix-ui/react-toast";
+import { toast } from "sonner";
 
 const Salaries: React.FC = () => {
   const { allEmployees } = useEmployees();
@@ -17,6 +19,37 @@ const Salaries: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [salaryPayments, setSalaryPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+
+    useEffect(() => {
+      const fetchSettings = async () => {
+        try {
+          const response = await fetch(`${baseUrl}/salaries/${selectedMonth}${selectedYear}`, {
+            method: 'GET',
+            credentials: 'include', // 🔑 This makes the browser send cookies
+          });
+  
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Error ${response.status}: ${errorText}`);
+          }
+  
+          const data = await response.json();
+          console.log('Fetched settings:', data);
+          setSalaryPayments(data);
+        } catch (err: any) {
+          console.error('Failed to fetch settings:', err);
+          toast(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+  
+      fetchSettings();
+    }, []);
 
   const months = [
     { value: "0", label: "January" },
@@ -36,9 +69,9 @@ const Salaries: React.FC = () => {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
 
   // Filter payments for selected month/year
-  const currentPayments = salaryPayments.filter(payment => 
-    payment.month === selectedMonth && payment.year === selectedYear.toString()
-  );
+  // const currentPayments = salaryPayments.filter(payment => 
+  //   payment.month === selectedMonth && payment.year === selectedYear.toString()
+  // );
 
   const handleUpdatePayment = (id: string, updates: any) => {
     setSalaryPayments(prev => prev.map(payment => 
@@ -143,7 +176,8 @@ const Salaries: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-900">
-                {currentPayments.filter(p => p.status === 'paid').length}
+                {/* {currentPayments.filter(p => p.status === 'paid').length} */}
+                paid salaries
               </div>
             </CardContent>
           </Card>
@@ -157,7 +191,8 @@ const Salaries: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-900">
-                ₹{currentPayments.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()}
+                {/* ₹{currentPayments.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()} */}
+                sum of salaries
               </div>
             </CardContent>
           </Card>
@@ -179,9 +214,9 @@ const Salaries: React.FC = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {currentPayments.length > 0 ? (
+                {salaryPayments.length > 0 ? (
                   <SalaryPaymentTable 
-                    payments={currentPayments}
+                    payments={salaryPayments}
                     onUpdatePayment={handleUpdatePayment}
                   />
                 ) : (

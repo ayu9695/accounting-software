@@ -72,7 +72,7 @@ const Settings = () => {
     tdsRate: "10",
     enableAutoCalculation: true,
     taxes: [
-      { id: "1", name: "CGST", percentage: 9 },
+      { id: "1", name: "CGST", percentage: 15 },
       { id: "2", name: "SGST", percentage: 9 },
       { id: "3", name: "IGST", percentage: 18 },
     ]
@@ -97,6 +97,7 @@ const Settings = () => {
   };
 
   interface Settings {
+    _id: string;
   tenantId: string;
   domain: string;
   tenantNumber: number;
@@ -112,6 +113,7 @@ const Settings = () => {
     sgst: number;
     igst: number;
   };
+  defaultTdsRate: number;
   phone?: string;
   address?: string;
   invoicePrefix?: string;
@@ -186,6 +188,24 @@ interface Department {
 
     fetchSettings();
   }, []);
+
+  const handleUpdateSettings = async (deptId: string, updatedData: Partial<Settings>) => {
+  try {
+    const response = await fetch(`${baseUrl}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(updatedData)
+    });
+
+    if (!response.ok) throw new Error('Failed to update settings');
+    
+    const updatedDept: Settings = await response.json();
+    toast({ title: 'Success', description: 'Department updated successfully' });
+  } catch (err) {
+    toast({ title: 'Error', description: 'Failed to update department', variant: 'destructive' });
+  }
+};
 
   useEffect(() => {
     const fetchDepartments = async () => {
@@ -300,12 +320,12 @@ const handleDeleteDepartment = async (deptId: string) => {
             >
               Company Profile
             </TabsTrigger>
-            <TabsTrigger 
+            {/* <TabsTrigger 
               value="email"
               className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accounting-blue pb-2 pt-2"
             >
               Email Settings
-            </TabsTrigger>
+            </TabsTrigger> */}
             <TabsTrigger 
               value="tax"
               className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accounting-blue pb-2 pt-2"
@@ -351,7 +371,7 @@ const handleDeleteDepartment = async (deptId: string) => {
                     <Input 
                       id="companyName" 
                       value={settings.name}
-                      // onChange={(e) => setCompanySettings({...companySettings, name: e.target.value})}
+                      onChange={(e) => handleUpdateSettings(settings._id, {name: settings.name})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -360,7 +380,7 @@ const handleDeleteDepartment = async (deptId: string) => {
                       id="companyEmail" 
                       type="email"
                       value={settings.email}
-                      // onChange={(e) => setCompanySettings({...companySettings, email: e.target.value})}
+                      onChange={(e) => handleUpdateSettings(settings._id, {name: settings.email})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -368,7 +388,7 @@ const handleDeleteDepartment = async (deptId: string) => {
                     <Input 
                       id="companyPhone" 
                       value={settings.phone}
-                      // onChange={(e) => setCompanySettings({...companySettings, phone: e.target.value})}
+                      onChange={(e) => handleUpdateSettings(settings._id, {name: settings.phone})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -376,7 +396,7 @@ const handleDeleteDepartment = async (deptId: string) => {
                     <Input 
                       id="taxId" 
                       value={settings.gstNumber}
-                      // onChange={(e) => setCompanySettings({...companySettings, taxId: e.target.value})}
+                      onChange={(e) => handleUpdateSettings(settings._id, {name: settings.gstNumber})}
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
@@ -384,13 +404,18 @@ const handleDeleteDepartment = async (deptId: string) => {
                     <Input 
                       id="address" 
                       value={settings.address}
-                      // onChange={(e) => setCompanySettings({...companySettings, address: e.target.value})}
+                      onChange={(e) => handleUpdateSettings(settings._id, {name: settings.address})}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Default Currency</Label>
-                    <Select
-                      value={companySettings.currency}
+                    <Input 
+                      id="address" 
+                      value={settings.currency}
+                      onChange={(e) => handleUpdateSettings(settings._id, {name: settings.currency})}
+                    />
+                    {/* <Select
+                      value={settings.currency}
                       // onValueChange={(value) => setCompanySettings({...companySettings, currency: value})}
                     >
                       <SelectTrigger id="currency">
@@ -403,7 +428,7 @@ const handleDeleteDepartment = async (deptId: string) => {
                           </SelectItem>
                         ))}
                       </SelectContent>
-                    </Select>
+                    </Select> */}
                   </div>
                 </div>
 
@@ -523,7 +548,7 @@ const handleDeleteDepartment = async (deptId: string) => {
                     <Label htmlFor="tdsRate">Default TDS Rate (%)</Label>
                     <Input 
                       id="tdsRate" 
-                      value={taxSettings.tdsRate}
+                      value={settings.defaultTdsRate}
                       onChange={(e) => setTaxSettings({...taxSettings, tdsRate: e.target.value})}
                     />
                   </div>
@@ -534,7 +559,40 @@ const handleDeleteDepartment = async (deptId: string) => {
                 <div className="space-y-4">
                   <h3 className="font-medium">Available Taxes</h3>
                   <div className="border rounded-md p-4 space-y-4">
-                    {taxSettings.taxes.map((tax, index) => (
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-4">
+                          <Input 
+                            value='CSGT'
+                          />
+                          <Input 
+                            type="number"
+                            value={settings.defaultTaxRates.cgst}
+                            className="w-20"
+                            onChange={(e) => {
+                              handleUpdateSettings(settings._id, {defaultTaxRates: settings.defaultTaxRates})
+                            }}
+                          />
+                          <span className="flex items-center">%</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-4">
+                          <Input 
+                            value='SGST'
+                          />
+                          <Input 
+                            type="number"
+                            value={settings.defaultTaxRates.sgst}
+                            className="w-20"
+                            onChange={(e) => {
+                              handleUpdateSettings(settings._id, {defaultTaxRates: settings.defaultTaxRates})
+                            }}
+                          />
+                          <span className="flex items-center">%</span>
+                        </div>
+                    </div>
+
+                    {/* {taxSettings.taxes.map((tax, index) => (
                       <div key={tax.id} className="flex items-center justify-between">
                         <div className="flex gap-4">
                           <Input 
@@ -570,8 +628,8 @@ const handleDeleteDepartment = async (deptId: string) => {
                           Remove
                         </Button>
                       </div>
-                    ))}
-                    <Button 
+                    ))} */}
+                    {/* <Button 
                       variant="outline" 
                       onClick={() => {
                         const newId = (parseInt(taxSettings.taxes[taxSettings.taxes.length - 1]?.id || "0") + 1).toString();
@@ -582,7 +640,7 @@ const handleDeleteDepartment = async (deptId: string) => {
                       }}
                     >
                       Add Tax Type
-                    </Button>
+                    </Button> */}
                   </div>
                 </div>
 

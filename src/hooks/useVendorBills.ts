@@ -122,6 +122,7 @@ export const useVendorBills = () => {
   // Update vendor bill
   const updateVendorBill = async (id: string, updates: Partial<VendorBill>) => {
     try {
+      console.log("updating bill data: ", updates)
       setLoading(true);
       const response = await fetch(`${baseUrl}/vendor-bills/${id}`, {
         method: 'PUT',
@@ -131,6 +132,7 @@ export const useVendorBills = () => {
         },
         body: JSON.stringify(updates)
       });
+      console.log("response received : ", response);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -205,6 +207,39 @@ export const useVendorBills = () => {
     }
   };
 
+  const updateVendorPayment = async (id: string, updates: Partial<VendorBill>) => {
+    try {
+      console.log("updating payment for vendor bill: ", updates)
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendor-bills/payment/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates)
+      });
+      console.log("response received : ", response);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const updatedBill = await response.json();
+      setVendorBills(prev => prev.map(bill => 
+        bill._id === id ? { ...bill, ...updatedBill.vendorBill || updatedBill } : bill
+      ));
+      toast.success("Vendor bill payment updated successfully");
+      return updatedBill.vendorBill || updatedBill;
+    } catch (error) {
+      console.error("Error updating payment for vendor bill:", error);
+      toast.error("Failed to update payment for vendor bill");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Refresh data
   const refreshData = () => {
     fetchVendors();
@@ -213,9 +248,9 @@ export const useVendorBills = () => {
 
   // Calculate summary statistics
   const totalAmount = vendorBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
-  const totalTDS = vendorBills.reduce((sum, bill) => sum + bill.tdsAmount, 0);
-  const totalPayable = vendorBills.reduce((sum, bill) => sum + bill.payableAmount, 0);
-  const pendingBills = vendorBills.filter(bill => bill.status === 'pending').length;
+  const totalTDS = vendorBills.reduce((sum, bill) => sum + bill.payableAmount, 0);
+  const totalPayable = vendorBills.reduce((sum, bill) => sum + (bill.pendingAmount? bill.pendingAmount:0 ), 0);
+  const pendingBills = vendorBills.filter(bill => bill.paymentStatus === 'unpaid').length;
 
   return {
     vendorBills: filteredBills,
@@ -224,6 +259,7 @@ export const useVendorBills = () => {
     loading,
     error,
     filters,
+    updateVendorPayment,
     updateFilters,
     clearFilters,
     getActiveFilters,

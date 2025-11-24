@@ -81,7 +81,7 @@ export const SalaryPaymentTable: React.FC<SalaryPaymentTableProps> = ({
               <TableCell className="text-right text-green-600">+₹{payment.allowances.toLocaleString()}</TableCell>
               <TableCell className="text-right text-red-600">-₹{payment.deductions.toLocaleString()}</TableCell>
               <TableCell className="text-center">{payment.leaves}</TableCell>
-              <TableCell className="text-right text-red-500">-₹{payment.leavesDeduction.toLocaleString()}</TableCell>
+              <TableCell className="text-right text-red-500">-₹0</TableCell>
               <TableCell className="text-right font-bold">₹{payment.netSalary.toLocaleString()}</TableCell>
               <TableCell>
                 <Badge 

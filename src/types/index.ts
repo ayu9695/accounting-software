@@ -60,6 +60,10 @@ export interface Invoice {
   customField?: string;
   notes?: string;
   paymentHistory: PaymentRecord[];
+  paymentMethod: string,
+  paidAmount: number,
+  paymenReference: string,
+  remainingAmount: number
 }
 
 export interface PaymentRecord {
@@ -209,15 +213,18 @@ export interface VendorBill {
   tdsRate: number;
   tdsAmount: number;
   payableAmount: number;
-  status: 'pending' | 'verified' | 'paid';
+  status: 'pending' | 'verified' | 'unverified' | 'cancelled';
   description?: string;
   fileName?: string;
   fileUrl?: string;
-  paymentDate?: string;
+  paymentDate?: Date;
   paymentMethod?: string;
   paymentReference?: string;
   verifiedDate?: string;
   verifiedBy?: string;
+  paidAmount?: number;
+  pendingAmount? : number;
+  paymentStatus: 'pending' | 'unpaid' | 'paid' | 'partial' | 'cancelled';
 }
 
 export interface Vendor {

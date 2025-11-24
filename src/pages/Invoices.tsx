@@ -9,13 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Download, Filter, Eye, Edit, Send, CalendarIcon, X } from "lucide-react";
+import { PlusCircle, Download, Filter, Eye, Edit, Send, CalendarIcon, X, CreditCard } from "lucide-react";
 import { CreateInvoiceForm } from "@/components/invoices/CreateInvoiceForm";
 import { Invoice, ViewInvoiceDialog, EditInvoiceDialog } from "@/components/invoices/InvoicesDialog";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useInvoices } from "@/hooks/useInvoices";
+import { PaymentDialog } from "@/components/common/PaymentDialog";
 
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 
 // interface Invoice {
 //   _id: string;
@@ -63,6 +65,7 @@ interface FilterState {
 }
 
 const Invoices: React.FC = () => {
+  const { updateInvoicePayment } = useInvoices();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -79,6 +82,13 @@ const Invoices: React.FC = () => {
     endDate: undefined,
     status: 'all'
   });
+
+  const [paymentDialog, setPaymentDialog] = useState({
+    open: false,
+    billId: "",
+    billNumber: "",
+    amount: 0,
+  });
  
   const baseUrl = import.meta.env.VITE_API_URL;
 
@@ -93,7 +103,11 @@ const Invoices: React.FC = () => {
         setFilteredInvoices(data);
       } catch (error) {
         console.error("Error fetching invoices:", error);
-        toast.error("Failed to load invoices");
+        toast({
+        title: "Error",
+        description: "Failed to load invoices.",
+        variant: "destructive",
+      });
       } finally {
         setLoading(false);
       }
@@ -146,6 +160,30 @@ const Invoices: React.FC = () => {
       case 'partial': return 'bg-blue-100 text-blue-800';
       case 'overdue': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+    const handlePayment = async (paymentData: any) => {
+    try {
+      console.log("paid maount is : ", paymentData);
+      await updateInvoicePayment(paymentDialog.billId, {
+        // paymentDate: paymentData.paymentDate,
+        paymentMethod: paymentData.paymentMethod,
+        paidAmount: paymentData.amount,
+        paymenReference: paymentData.paymentRefernce
+      });
+
+      toast({
+        title: "Payment Recorded",
+        description: `Payment for ${paymentDialog.billNumber} recorded successfully.`,
+      });
+      setPaymentDialog({ open: false, billId: "", billNumber: "", amount: 0 });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to record payment. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -426,7 +464,8 @@ const Invoices: React.FC = () => {
                 <TableHead>Client</TableHead>
                 <TableHead>Issue Date</TableHead>
                 <TableHead>Due Date</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead className="text-right">Pending Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -447,7 +486,8 @@ const Invoices: React.FC = () => {
                     <TableCell>{invoice.clientName}</TableCell>
                     <TableCell>{new Date(invoice.issueDate).toLocaleDateString()}</TableCell>
                     <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right font-medium">₹{invoice.total.toLocaleString()}</TableCell>
+                    <TableCell>₹{invoice.total.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-medium">₹{invoice.remainingAmount ? invoice.remainingAmount : 0}</TableCell>
                     <TableCell><Badge className={getStatusColor(invoice.status)}>{invoice.status}</Badge></TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -455,7 +495,21 @@ const Invoices: React.FC = () => {
                           title="View Invoice"> <Eye className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => setEditInvoice(invoice)}
                           title="Edit Invoice"><Edit className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="sm"><Send className="h-4 w-4" /></Button>                        
+                        <Button variant="ghost" size="sm"><Send className="h-4 w-4" /></Button>     
+                        <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => setPaymentDialog({ 
+                                    open: true, 
+                                    billId: invoice._id, 
+                                    billNumber: invoice.invoiceNumber, 
+                                    amount: invoice.total
+                                  })}
+                                  title="Record Payment"
+                                  className="text-green-600 hover:text-green-800"
+                                >
+                                  <CreditCard className="h-4 w-4" />
+                                </Button>                   
                       </div>
                     </TableCell>
                   </TableRow>
@@ -471,7 +525,10 @@ const Invoices: React.FC = () => {
         onOpenChange={setCreateDialogOpen}
         onCreateInvoice={(newInvoice) => {
           setInvoices(prev => [...prev, newInvoice]);
-          toast.success("Invoice created!");
+          toast({
+            title: "Invoice created",
+            description: "Invoice created"
+          })
         }}
       />
             <ViewInvoiceDialog
@@ -493,8 +550,16 @@ const Invoices: React.FC = () => {
             inv._id === updatedInvoice._id ? updatedInvoice : inv
           ));
           setEditInvoice(null);
-          toast.success("Invoice updated successfully!");
+          toast({
+            title : "Invoice updated successfully!"});
         }}
+      />
+      <PaymentDialog
+          open={paymentDialog.open} 
+          onOpenChange={(open) => setPaymentDialog({ ...paymentDialog, open })} 
+          onPayment={handlePayment} 
+          totalAmount={paymentDialog.amount} 
+          title={`Record Payment - ${paymentDialog.billNumber}`} 
       />
     </PageLayout>
   );

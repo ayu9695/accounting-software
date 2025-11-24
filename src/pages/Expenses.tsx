@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,82 +16,145 @@ interface Expense {
   description: string;
   amount: number;
   category: string;
-  date: string;
-  vendor: string;
+  date: Date;
+  // vendor: string;
   status: 'pending' | 'paid';
+  approvalStatus: true | false;
+  paymentStatus: true | false;
   paymentDate?: string;
   paymentMethod?: string;
   paymentReference?: string;
   notes?: string;
 }
 
+interface paymentMethods {
+  id: string;
+  code: string;
+  name: string;
+};
+
 const initialExpenses: Expense[] = [
-  {
-    id: "1",
-    description: "Office Rent - January 2024",
-    amount: 50000,
-    category: "Rent",
-    date: "2024-01-01",
-    vendor: "Property Management Co.",
-    status: "paid",
-    paymentDate: "2024-01-01",
-    paymentMethod: "bank_transfer",
-    paymentReference: "TXN123456"
-  },
-  {
-    id: "2",
-    description: "Software Licenses",
-    amount: 25000,
-    category: "Software",
-    date: "2024-01-05",
-    vendor: "Tech Solutions Ltd.",
-    status: "pending"
-  },
-  {
-    id: "3",
-    description: "Office Supplies",
-    amount: 8500,
-    category: "Supplies",
-    date: "2024-01-08",
-    vendor: "Office Mart",
-    status: "pending"
-  },
-  {
-    id: "4",
-    description: "Internet & Phone Bills",
-    amount: 12000,
-    category: "Utilities",
-    date: "2024-01-10",
-    vendor: "Telecom Provider",
-    status: "paid",
-    paymentDate: "2024-01-10",
-    paymentMethod: "credit_card",
-    paymentReference: "CC789012"
-  },
-  {
-    id: "5",
-    description: "Marketing Campaign",
-    amount: 75000,
-    category: "Marketing",
-    date: "2024-01-15",
-    vendor: "Digital Agency",
-    status: "pending"
-  }
+  // {
+  //   id: "1",
+  //   description: "Office Rent - January 2024",
+  //   amount: 50000,
+  //   category: "Rent",
+  //   date: 2024-01-01,
+  //   status: "paid",
+  //   paymentStatus : "true",
+  //   approvalStatus : "true",
+  //   paymentDate: "2024-01-01",
+  //   paymentMethod: "bank_transfer",
+  //   paymentReference: "TXN123456"
+  // },
+  // {
+  //   id: "2",
+  //   description: "Software Licenses",
+  //   amount: 25000,
+  //   approvalStatus : "true",
+  //   category: "Software",
+  //   date: "2024-01-05",
+  //   status: "pending",
+  //   paymentStatus : "false",
+  // }
+  // {
+  //   _id: "3",
+  //   description: "Office Supplies",
+  //   amount: 8500,
+  //   category: "Supplies",
+  //   date: "2024-01-08",
+  //   status: "pending"
+  // },
+  // {
+  //   _id: "4",
+  //   description: "Internet & Phone Bills",
+  //   amount: 12000,
+  //   category: "Utilities",
+  //   date: "2024-01-10",
+  //   status: "paid",
+  //   paymentDate: "2024-01-10",
+  //   paymentMethod: "credit_card",
+  //   paymentReference: "CC789012"
+  // },
+  // {
+  //   _id: "5",
+  //   description: "Marketing Campaign",
+  //   amount: 75000,
+  //   category: "Marketing",
+  //   date: "2024-01-15",
+  //   status: "pending"
+  // }
 ];
 
 const Expenses: React.FC = () => {
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [addExpenseDialogOpen, setAddExpenseDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [loading, setLoading] = useState(true);
   
   // Filter states
   const [searchValue, setSearchValue] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [paymentMethods, setPaymentMethods] = useState<[]>([]);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+  useEffect(() => {
+    const fetchExpenses = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/expenses`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        const newexpense: Expense[] = data.map((item:any) =>({
+          id: item.id,
+          description: item.description,
+          amount: item.amount,
+          category: item.category,
+          date: item.date,
+          status: item.status ?? false,  // 👈 if data.status is undefined → becomes null
+          paymentDate: item.paymentDate,
+          paymentStatus: item.paymentStatus ?? false,
+          approvalStatus: item.approvalStatus ?? false,
+          paymentMethod: item.paymentMethod,
+          paymentReference: item.paymentReference,
+          notes: item.notes,
+        }));
+        setExpenses(newexpense);
+        console.log("expenses received : ", data, " expense set : ", expenses);
+      } catch (error) {
+        console.error("Error fetching invoices:", error);
+        toast.error("Failed to load invoices");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchExpenses();
+  }, []);
+
+  useEffect(()=> {
+    const fetchPaymentMethods = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${baseUrl}/paymentMethods`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        setPaymentMethods(data);
+      } catch(error){
+        console.error("Error fetching paymentMethods:", error);
+        toast.error("Failed to load Payment Methods");
+      } finally{
+        setLoading(false);
+      }
+    };
+    fetchPaymentMethods();
+  }, []);
 
   // Filter options
   const statusOptions = [
@@ -111,7 +174,6 @@ const Expenses: React.FC = () => {
     { value: "date", label: "Date" },
     { value: "amount", label: "Amount" },
     { value: "description", label: "Description" },
-    { value: "vendor", label: "Vendor" },
     { value: "category", label: "Category" }
   ];
 
@@ -124,7 +186,6 @@ const Expenses: React.FC = () => {
       const query = searchValue.toLowerCase();
       result = result.filter(expense =>
         expense.description.toLowerCase().includes(query) ||
-        expense.vendor.toLowerCase().includes(query) ||
         expense.category.toLowerCase().includes(query)
       );
     }
@@ -197,13 +258,42 @@ const Expenses: React.FC = () => {
     }
   };
 
-  const handlePaymentSubmit = (paymentData: {
+  const handlePaymentSubmit = async(paymentData: {
     paymentDate: string;
     paymentMethod: string;
     reference?: string;
     notes?: string;
   }) => {
     if (!selectedExpense) return;
+      const payload = {
+        paymentDate: paymentData.paymentDate,          // ISO string e.g. "2025-11-14"
+        paymentMethod: paymentData.paymentMethod,      // should be the code or id string
+        paymentReference: paymentData.reference,
+        paymentNotes: paymentData.notes,
+        paymentStatus: true
+      };
+
+
+    try{
+      const response = await fetch(`${baseUrl}/expenses/${selectedExpense.id}`, {
+          credentials: 'include',
+          method: 'PUT',
+          headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+        });
+
+        const updatedExpensePayment = await response.json();
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error("Failed to record payment");
+    }
+
+    } catch (error){
+        console.error("Error update payment:", error);
+        toast.error("Failed to record payment");
+    }
 
     setExpenses(prev => prev.map(expense => 
       expense.id === selectedExpense.id 
@@ -217,33 +307,55 @@ const Expenses: React.FC = () => {
           }
         : expense
     ));
+    
 
     toast.success(`Payment recorded for ${selectedExpense.description}`);
   };
 
-  const handleAddExpense = (expenseData: {
+  const handleAddExpense = async(expenseData: {
     description: string;
     amount: number;
     category: string;
     date: string;
-    vendor: string;
   }) => {
-    const newExpense: Expense = {
-      id: Date.now().toString(),
-      ...expenseData,
-      status: 'pending'
-    };
+    // const newExpense: Expense = {
+    //   _id: Date.now().toString(),
+    //   ...expenseData,
+    //   status: 'pending'
+    // };
 
-    setExpenses(prev => [newExpense, ...prev]);
-    toast.success("Expense added successfully");
+    // setExpenses(prev => [newExpense, ...prev]);
+    // toast.success("Expense added successfully");
+    try{
+      console.log("Adding expense:", expenseData);
+      const response = await fetch(`${baseUrl}/expenses`, {
+          credentials: 'include',
+          method: 'POST',
+          headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(expenseData)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error("Failed to record payment");
+        }
+      setExpenses(data);
+      toast.success("Expense added successfully");
+
+    } catch (error){
+        console.error("Error update payment:", error);
+        toast.error("Failed to record payment");
+    }
   };
 
   const handleExport = () => {
     const csvContent = [
-      ['Description', 'Vendor', 'Category', 'Date', 'Amount', 'Status', 'Payment Date', 'Payment Method'].join(','),
+      ['Description', 'Category', 'Date', 'Amount', 'Status', 'Payment Date', 'Payment Method'].join(','),
       ...filteredExpenses.map(expense => [
         expense.description,
-        expense.vendor,
         expense.category,
         expense.date,
         expense.amount,
@@ -357,10 +469,10 @@ const Expenses: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="font-semibold">Description</TableHead>
-                  <TableHead className="font-semibold">Vendor</TableHead>
                   <TableHead className="font-semibold">Category</TableHead>
                   <TableHead className="font-semibold">Date</TableHead>
                   <TableHead className="text-right font-semibold">Amount</TableHead>
+                  <TableHead className="font-semibold">Approval Status</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="font-semibold">Payment Details</TableHead>
                   <TableHead className="font-semibold">Actions</TableHead>
@@ -370,20 +482,27 @@ const Expenses: React.FC = () => {
                 {filteredExpenses.map((expense) => (
                   <TableRow key={expense.id}>
                     <TableCell className="font-medium">{expense.description}</TableCell>
-                    <TableCell>{expense.vendor}</TableCell>
                     <TableCell>{expense.category}</TableCell>
                     <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right font-medium">₹{expense.amount.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge 
-                        variant={expense.status === 'paid' ? 'default' : 'secondary'}
-                        className={expense.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}
+                        variant={expense.approvalStatus === true ? 'default' : 'secondary'}
+                        className={expense.approvalStatus === true ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}
                       >
-                        {expense.status === 'paid' ? 'Paid' : 'Pending'}
+                        {expense.approvalStatus === true ? 'Approved' : 'Pending'}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {expense.status === 'paid' ? (
+                      <Badge 
+                        variant={expense.paymentStatus === true ? 'default' : 'secondary'}
+                        className={expense.paymentStatus === true ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}
+                      >
+                        {expense.paymentStatus === true ? 'Paid' : 'Pending'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {expense.paymentStatus === true ? (
                         <div className="text-sm">
                           <div>{expense.paymentMethod?.replace('_', ' ').toUpperCase()}</div>
                           <div className="text-gray-500">{expense.paymentDate}</div>
@@ -396,7 +515,7 @@ const Expenses: React.FC = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {expense.status === 'pending' ? (
+                      {expense.paymentStatus === false ? (
                         <Button
                           size="sm"
                           onClick={() => handleRecordPayment(expense.id)}

@@ -35,7 +35,7 @@ const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
       const baseUrl = import.meta.env.VITE_API_URL;
 
-      useEffect(() => {
+    useEffect(() => {
     const fetchInvoices = async () => {
       try {
         const response = await fetch(`${baseUrl}/invoices`, {

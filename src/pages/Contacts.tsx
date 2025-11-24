@@ -224,8 +224,17 @@ const handleEditContact = (contact: Contact) => {
   setIsEditContactDialogOpen(true);
 };
 
-const handleUpdateContact = async () => {
+const handleUpdateContact = async (contact: Contact) => {
+
   if (!editingContact) return;
+  setEditingContact(contact);
+  setEditContactData({
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    position: contact.position,
+  });
+  setIsEditContactDialogOpen(true);
   
   if (!editContactData.name || !editContactData.email) {
     toast.error("Please fill in required fields");

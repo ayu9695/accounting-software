@@ -115,7 +115,7 @@ const loading = auth?.loading;
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/vendor-bills" element={<VendorBills />} />
               <Route path="/taxes" element={<Taxes />} />
-              <Route path="/reports" element={<Reports />} />
+              {/* <Route path="/reports" element={<Reports />} /> */}
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/email-templates" element={<EmailTemplates />} />
               <Route path="/settings" element={<Settings />} />

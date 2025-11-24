@@ -120,6 +120,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       const response = await fetch(`${baseUrl}/clients`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch clients');
       const clientsData = await response.json();
+      console.log("cleints fetched : ", clients);
       setClients(clientsData);
     } catch (error) {
       console.error('Error fetching clients:', error);

@@ -16,7 +16,6 @@ interface AddExpenseDialogProps {
     amount: number;
     category: string;
     date: string;
-    vendor: string;
   }) => void;
 }
 
@@ -65,11 +64,6 @@ export const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({
       return;
     }
     
-    if (!formData.vendor.trim()) {
-      toast.error("Please enter a vendor name");
-      return;
-    }
-    
     if (!formData.date) {
       toast.error("Please select a date");
       return;
@@ -79,8 +73,7 @@ export const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({
       description: formData.description.trim(),
       amount: parseFloat(formData.amount),
       category: formData.category,
-      date: formData.date,
-      vendor: formData.vendor.trim()
+      date: formData.date
     });
 
     // Reset form
@@ -173,8 +166,8 @@ export const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vendor">Vendor *</Label>
+          {/* <div className="space-y-2">
+            <Label htmlFor="vendor">Vendor</Label>
             <Input
               id="vendor"
               value={formData.vendor}
@@ -182,7 +175,7 @@ export const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({
               placeholder="Enter vendor name"
               required
             />
-          </div>
+          </div> */}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel}>

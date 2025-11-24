@@ -54,15 +54,14 @@ export interface Invoice {
   total: number;
   status: 'paid' | 'unpaid' | 'partial' | 'overdue';
   notes?: string;
-  paymentHistory?: Array<{
     amount: number;
     paymentDate: string;
     paymentMethod?: string;
     reference?: string;
-    notes?: string;
-  }>;
+    paymentnotes?: string;
   createdAt: string;
   updatedAt: string;
+  remainingAmount: number;
 }
 
 interface ViewInvoiceDialogProps {
@@ -349,7 +348,7 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
           )}
 
           {/* Payment History */}
-          {invoice.paymentHistory && invoice.paymentHistory.length > 0 && (
+          {/* {invoice.paymentHistory && invoice.paymentHistory.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg text-blue-700">Payment History</CardTitle>
@@ -374,7 +373,7 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
                 </div>
               </CardContent>
             </Card>
-          )}
+          )} */}
         </div>
       </DialogContent>
     </Dialog>
