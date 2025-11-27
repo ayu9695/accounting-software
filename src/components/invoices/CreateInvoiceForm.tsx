@@ -22,7 +22,10 @@ interface BankDetails {
 interface LineItem {
   id: string;
   description: string;
-  quantity: number;
+  rateType: 'hourly' | 'monthly';
+  hours?: number; // Only for hourly
+  lop?: number; // Only for monthly
+  extraDays?: number; // Only for monthly
   rate: number;
   amount: number;
   resourceName: string;
@@ -77,7 +80,8 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: "1", description: "", quantity: 1, rate: 0, amount: 0, resourceName: "", periodFrom: "", periodTo: "" }
+    { id: "1", description: "", rate: 0,
+    rateType: 'monthly', amount: 0, resourceName: "", periodFrom: "", periodTo: "" }
   ]);
 
   // New states for client management
@@ -333,9 +337,17 @@ const handleSelectBankById = (id: string) => {
     setLineItems(items => items.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
-        if (field === 'quantity' || field === 'rate') {
-          updated.amount = Number(updated.quantity) * Number(updated.rate);
+        if (field === 'rateType') {
+        if (value === 'hourly') {
+          delete updated.lop;
+          delete updated.extraDays;
+          updated.hours = updated.hours || 0;
+        } else {
+          delete updated.hours;
+          updated.lop = updated.lop || 0;
+          updated.extraDays = updated.extraDays || 0;
         }
+      }
         return updated;
       }
       return item;
@@ -346,7 +358,7 @@ const handleSelectBankById = (id: string) => {
     const newItem: LineItem = {
       id: Date.now().toString(),
       description: "",
-      quantity: 1,
+      rateType: 'monthly',
       rate: 0,
       amount: 0,
       resourceName: "",
@@ -466,7 +478,7 @@ const handleSelectBankById = (id: string) => {
       notes: "",
       termsAndConditions: ""
     });
-    setLineItems([{ id: "1", description: "", quantity: 1, rate: 0, amount: 0, resourceName: "", periodFrom: "", periodTo: "" }]);
+    setLineItems([{ id: "1", description: "", rateType: 'monthly', rate: 0, amount: 0, resourceName: "", periodFrom: "", periodTo: "" }]);
     setClientSearch("");
     setShowClientDropdown(false);
   };
@@ -792,88 +804,150 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {lineItems.map((item, index) => (
-                  <div key={item.id} className="grid grid-cols-12 gap-3 items-end p-4 border rounded-lg bg-gray-50">
-                    <div className="col-span-5">
-                      <Label className="text-sm font-medium">Description *</Label>
-                      <Input
-                        value={item.description}
-                        onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
-                        placeholder="Enter item description"
-                        className="mt-1"
-                      />
+                  <div key={item.id} className="p-4 border rounded-lg bg-gray-50 space-y-4">
+                    {/* Row 1: Description, Currency, Rate Type, Delete */}
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                      <div className="col-span-5">
+                        <Label className="text-sm font-medium">Description *</Label>
+                        <Input
+                          value={item.description}
+                          onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
+                          placeholder="Enter item description"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-sm font-medium">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.rate}
+                          placeholder="0.00"
+                          onChange={(e) => updateLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                          onWheel={blockNumberInputScroll}
+                          onKeyDown={blockNumberInputArrows}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-sm font-medium">Amount</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.amount}
+                          placeholder="0.00"
+                          onChange={(e) => updateLineItem(item.id, 'amount', parseFloat(e.target.value) || 0)}
+                          onWheel={blockNumberInputScroll}
+                          onKeyDown={blockNumberInputArrows}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        {lineItems.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLineItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-sm font-medium">Quantity</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-sm font-medium">Rate</Label>
-                      <Input
-                        type="number"
-                        // min="0"
-                        step="1"
-                        value={item.rate}
-                        placeholder="0.00"
-                        onChange={(e) => updateLineItem(item.id, 'rate', parseFloat(e.target.value))}
-                        onWheel={blockNumberInputScroll}
-                        onKeyDown={blockNumberInputArrows}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-sm font-medium">Amount</Label>
-                      <Input
-                        value={`₹${item.amount.toFixed(2)}`}
-                        readOnly
-                        className="bg-gray-100 mt-1"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      {lineItems.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeLineItem(item.id)}
+                        <Label className="text-sm font-medium">Rate Type</Label>
+                        <Select 
+                          value={item.rateType} 
+                          onValueChange={(value: 'hourly' | 'monthly') => updateLineItem(item.id, 'rateType', value)}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hourly">Hourly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    {/* Row 2: Conditional Fields (Hours OR LOP & Extra Days) + Amount */}
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                      {item.rateType === 'hourly' ? (
+                        <>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">Hours</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.hours || 0}
+                              onChange={(e) => updateLineItem(item.id, 'hours', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-6"></div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">LOP</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.lop || 0}
+                              onChange={(e) => updateLineItem(item.id, 'lop', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">Extra Days</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.extraDays || 0}
+                              onChange={(e) => updateLineItem(item.id, 'extraDays', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-3"></div>
+                        </>
                       )}
+                      
                     </div>
-                    <div className="col-span-5">
-                      <Label className="text-sm font-medium">Resource Name</Label>
-                      <Input
-                        value={item.resourceName}
-                        onChange={(e) => updateLineItem(item.id, 'resourceName', e.target.value)}
-                        placeholder="Enter resource name"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-sm font-medium">Period From</Label>
-                      <Input
-                        type="date"  // ✓ Already type="date"
-                        value={item.periodFrom}
-                        onChange={(e) => updateLineItem(item.id, 'periodFrom', e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-sm font-medium">Period To</Label>
-                      <Input
-                        type="date"  // ✓ Already type="date"
-                        value={item.periodTo}
-                        onChange={(e) => updateLineItem(item.id, 'periodTo', e.target.value)}
-                        className="mt-1"
-                      />
+
+                    {/* Row 3: Resource Name, Period From, Period To */}
+                    <div className="grid grid-cols-12 gap-3">
+                      <div className="col-span-4">
+                        <Label className="text-sm font-medium">Resource Name</Label>
+                        <Input
+                          value={item.resourceName}
+                          onChange={(e) => updateLineItem(item.id, 'resourceName', e.target.value)}
+                          placeholder="Enter resource name"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <Label className="text-sm font-medium">Period From</Label>
+                        <Input
+                          type="date"
+                          value={item.periodFrom}
+                          onChange={(e) => updateLineItem(item.id, 'periodFrom', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <Label className="text-sm font-medium">Period To</Label>
+                        <Input
+                          type="date"
+                          value={item.periodTo}
+                          onChange={(e) => updateLineItem(item.id, 'periodTo', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
