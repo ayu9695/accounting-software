@@ -9,12 +9,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Trash2, UserPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+interface BankDetails {
+  id?: string;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  ifscCode: string;
+  branch: string;
+  primaryAccount: boolean;
+}
+
 interface LineItem {
   id: string;
   description: string;
-  quantity: number;
+  rateType: 'hourly' | 'monthly';
+  hours?: number; // Only for hourly
+  lop?: number; // Only for monthly
+  extraDays?: number; // Only for monthly
   rate: number;
   amount: number;
+  resourceName: string;
+  periodFrom: string;
+  periodTo: string;
 }
 
 interface Client {
@@ -64,7 +80,8 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: "1", description: "", quantity: 1, rate: 0, amount: 0 }
+    { id: "1", description: "", rate: 0,
+    rateType: 'monthly', amount: 0, resourceName: "", periodFrom: "", periodTo: "" }
   ]);
 
   // New states for client management
@@ -74,6 +91,10 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   const [loadingClients, setLoadingClients] = useState(false);
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [showAddClientDialog, setShowAddClientDialog] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [bankDetails, setBankDetails] = useState<BankDetails[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState<string>("");
+  const [selectedBank, setSelectedBank] = useState<BankDetails | null>(null);
   const [newClientData, setNewClientData] = useState({
     name: "",
     email: "",
@@ -106,12 +127,60 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
         console.error('Faied to fetch departments:', err);
         setError(err.message);
       }
-      // finally{
-      //   setLoading(false);
-      // }
+      finally{
+        setLoading(false);
+      }
       };
       fetchDepartments();
     }, []);
+
+    useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true);
+      try{
+        const res = await fetch(`${baseUrl}/settings`, {
+          credentials: 'include'
+        });
+  
+        if(!res.ok) {
+          const errortext = await res.text();
+          throw new Error(`Error ${res.status}: ${errortext}`);
+        }
+        const data = await res.json();
+
+        // Sanitize bank details: ensure primaryAccount not null
+        const sanitized: BankDetails[] = (data.bankAccountDetails || []).map((b: any) => ({
+          id: b._id || b.id || b.accountNumber,
+          accountName: b.accountName || "",
+          accountNumber: b.accountNumber || "",
+          bankName: b.bankName || "",
+          ifscCode: b.ifscCode || "",
+          branch: b.branch || "",
+          primaryAccount: b.primaryAccount ?? false
+        }));
+
+        setBankDetails(sanitized);
+
+        // If a primary account exists, select it by default
+        const primary = sanitized.find((b) => b.primaryAccount === true);
+        if (primary) {
+          setSelectedBankId(primary.id || "");
+          setSelectedBank(primary);
+        } else {
+          setSelectedBankId("");
+          setSelectedBank(null);
+        }
+
+        console.log("fetched settings, bank details:", sanitized);
+      } catch(err: any){
+        console.error('Failed to fetch settings:', err);
+        setError(err.message);
+      } finally{
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Fetch clients from backend
   const fetchClients = async () => {
@@ -230,14 +299,55 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     }
   };
 
+  // Handle bank selection: sets selected bank by id and populates selectedBank
+const handleSelectBankById = (id: string) => {
+  setSelectedBankId(id);
+  // Find by id reliably
+  const bank = bankDetails.find(b => (b.id || "") === id) || null;
+
+  if (bank) {
+    // clone to avoid accidental mutation of array item
+    const bankCopy: BankDetails = {
+      id: bank.id,
+      accountName: bank.accountName,
+      accountNumber: bank.accountNumber,
+      bankName: bank.bankName,
+      ifscCode: bank.ifscCode,
+      branch: bank.branch,
+      primaryAccount: !!bank.primaryAccount
+    };
+    setSelectedBank(bankCopy);
+    console.log("Selected bank:", bankCopy);
+  } else {
+    setSelectedBank(null);
+    console.warn("Selected bank id not found:", id);
+  }
+};
+
+
+    // Allow editing of selected bank fields (if you want them editable)
+  const updateSelectedBankField = (field: keyof BankDetails, value: string | boolean) => {
+    setSelectedBank(prev => prev ? ({ ...prev, [field]: value }) : prev);
+    // Also reflect in bankDetails array so the UI stays consistent
+    setBankDetails(prev => prev.map(b => (b.id === selectedBankId ? ({ ...b, [field]: value }) : b)));
+  };
+
   // Existing line item functions (unchanged)
   const updateLineItem = (id: string, field: keyof LineItem, value: string | number) => {
     setLineItems(items => items.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
-        if (field === 'quantity' || field === 'rate') {
-          updated.amount = Number(updated.quantity) * Number(updated.rate);
+        if (field === 'rateType') {
+        if (value === 'hourly') {
+          delete updated.lop;
+          delete updated.extraDays;
+          updated.hours = updated.hours || 0;
+        } else {
+          delete updated.hours;
+          updated.lop = updated.lop || 0;
+          updated.extraDays = updated.extraDays || 0;
         }
+      }
         return updated;
       }
       return item;
@@ -248,9 +358,12 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     const newItem: LineItem = {
       id: Date.now().toString(),
       description: "",
-      quantity: 1,
+      rateType: 'monthly',
       rate: 0,
-      amount: 0
+      amount: 0,
+      resourceName: "",
+      periodFrom: "",
+      periodTo: ""
     };
     setLineItems([...lineItems, newItem]);
   };
@@ -287,6 +400,16 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
 
     setSavingInvoice(true);
 
+    const bankPayload = selectedBank ? {
+    id: selectedBank.id,
+    accountName: selectedBank.accountName,
+    accountNumber: selectedBank.accountNumber,
+    bankName: selectedBank.bankName,
+    ifscCode: selectedBank.ifscCode,
+    branch: selectedBank.branch,
+    primaryAccount: selectedBank.primaryAccount ?? false
+  } : null;
+
     try {
       const invoiceData = {
         ...formData,
@@ -299,8 +422,10 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
         igstAmount,
         totalTax,
         total,
-        status: "unpaid"
+        status: "unpaid",
+        bankAccountDetails: bankPayload
       };
+      console.log("Final invoiceData being sent:", invoiceData);
 
       // Save to backend
       const response = await fetch(`${baseUrl}/invoices`, {
@@ -353,10 +478,32 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
       notes: "",
       termsAndConditions: ""
     });
-    setLineItems([{ id: "1", description: "", quantity: 1, rate: 0, amount: 0 }]);
+    setLineItems([{ id: "1", description: "", rateType: 'monthly', rate: 0, amount: 0, resourceName: "", periodFrom: "", periodTo: "" }]);
     setClientSearch("");
     setShowClientDropdown(false);
   };
+
+  // Prevent wheel + arrow-up/down from changing number inputs
+const blockNumberInputScroll = (e: React.WheelEvent<HTMLInputElement>) => {
+  // blur is the most reliable cross-browser fix for wheel changing <input type="number">
+  e.currentTarget.blur();
+  // preventDefault is OK to keep as well
+  e.preventDefault();
+};
+
+// Prevent arrow keys changing number value
+const blockNumberInputArrows = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+    e.preventDefault();
+  }
+};
+
+// When number input is focused: select all. If value is 0, show an empty input to give clean typing UX.
+// For controlled inputs that keep numeric state, we'll render '' when value === 0
+const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+  // select asynchronously to avoid race with React focus handling
+  setTimeout(() => e.currentTarget.select(), 0);
+};
 
   return (
     <>
@@ -479,6 +626,109 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
             </CardContent>
           </Card>
 
+          {/* Bank Details Section (new) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-700">Bank Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Account Name dropdown */}
+                <div>
+                  <Label className="text-sm font-medium">Account Name</Label>
+                  <Select value={selectedBankId} onValueChange={(value) => handleSelectBankById(value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Account Name" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankDetails.length === 0 ? (
+                        <SelectItem value="">No bank accounts</SelectItem>
+                      ) : bankDetails.map((b) => (
+                      <SelectItem key={b.id} value={b.id || ""}>
+                        {b.accountName}
+                      </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Account Number dropdown */}
+                <div>
+                  <Label className="text-sm font-medium">Account Number</Label>
+                  <Select value={selectedBankId} onValueChange={(value) => handleSelectBankById(value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Account Number" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankDetails.length === 0 ? (
+                        <SelectItem value="">No bank accounts</SelectItem>
+                      ) : bankDetails.map((b) => (
+                      <SelectItem key={b.id} value={b.id || ""}>
+                        {b.accountNumber}
+                      </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Bank Name dropdown */}
+                <div>
+                  <Label className="text-sm font-medium">Bank Name</Label>
+                  <Select value={selectedBankId} onValueChange={(value) => handleSelectBankById(value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Bank Name" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankDetails.length === 0 ? (
+                        <SelectItem value="">No bank accounts</SelectItem>
+                      ) : bankDetails.map((b) => (
+                      <SelectItem key={b.id} value={b.id || ""}>
+                        {b.bankName}
+                      </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Populated bank fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">IFSC Code</Label>
+                  <Input
+                    value={selectedBank?.ifscCode || ""}
+                    // onChange={(e) => updateSelectedBankField("ifscCode", e.target.value)}
+                    readOnly
+                    placeholder="IFSC"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Branch</Label>
+                  <Input
+                    value={selectedBank?.branch || ""}
+                    // onChange={(e) => updateSelectedBankField("branch", e.target.value)}
+                    readOnly
+                    placeholder="Branch"
+                    className="mt-1"
+                  />
+                </div>
+                {/* <div>
+                  <Label className="text-sm font-medium">Primary Account</Label>
+                  <Select value={selectedBank?.primaryAccount ? "true" : "false"} onValueChange={(v) => updateSelectedBankField("primaryAccount", v === "true")}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div> */}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Rest of the form remains the same... */}
           {/* Invoice Details */}
           <Card>
@@ -554,58 +804,150 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {lineItems.map((item, index) => (
-                  <div key={item.id} className="grid grid-cols-12 gap-3 items-end p-4 border rounded-lg bg-gray-50">
-                    <div className="col-span-5">
-                      <Label className="text-sm font-medium">Description *</Label>
-                      <Input
-                        value={item.description}
-                        onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
-                        placeholder="Enter item description"
-                        className="mt-1"
-                      />
+                  <div key={item.id} className="p-4 border rounded-lg bg-gray-50 space-y-4">
+                    {/* Row 1: Description, Currency, Rate Type, Delete */}
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                      <div className="col-span-5">
+                        <Label className="text-sm font-medium">Description *</Label>
+                        <Input
+                          value={item.description}
+                          onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
+                          placeholder="Enter item description"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-sm font-medium">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.rate}
+                          placeholder="0.00"
+                          onChange={(e) => updateLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                          onWheel={blockNumberInputScroll}
+                          onKeyDown={blockNumberInputArrows}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-sm font-medium">Amount</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.amount}
+                          placeholder="0.00"
+                          onChange={(e) => updateLineItem(item.id, 'amount', parseFloat(e.target.value) || 0)}
+                          onWheel={blockNumberInputScroll}
+                          onKeyDown={blockNumberInputArrows}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        {lineItems.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLineItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-sm font-medium">Quantity</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-sm font-medium">Rate</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.rate}
-                        onChange={(e) => updateLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-sm font-medium">Amount</Label>
-                      <Input
-                        value={`₹${item.amount.toFixed(2)}`}
-                        readOnly
-                        className="bg-gray-100 mt-1"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      {lineItems.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeLineItem(item.id)}
+                        <Label className="text-sm font-medium">Rate Type</Label>
+                        <Select 
+                          value={item.rateType} 
+                          onValueChange={(value: 'hourly' | 'monthly') => updateLineItem(item.id, 'rateType', value)}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hourly">Hourly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    {/* Row 2: Conditional Fields (Hours OR LOP & Extra Days) + Amount */}
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                      {item.rateType === 'hourly' ? (
+                        <>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">Hours</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.hours || 0}
+                              onChange={(e) => updateLineItem(item.id, 'hours', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-6"></div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">LOP</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.lop || 0}
+                              onChange={(e) => updateLineItem(item.id, 'lop', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">Extra Days</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.extraDays || 0}
+                              onChange={(e) => updateLineItem(item.id, 'extraDays', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-3"></div>
+                        </>
                       )}
+                      
+                    </div>
+
+                    {/* Row 3: Resource Name, Period From, Period To */}
+                    <div className="grid grid-cols-12 gap-3">
+                      <div className="col-span-4">
+                        <Label className="text-sm font-medium">Resource Name</Label>
+                        <Input
+                          value={item.resourceName}
+                          onChange={(e) => updateLineItem(item.id, 'resourceName', e.target.value)}
+                          placeholder="Enter resource name"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <Label className="text-sm font-medium">Period From</Label>
+                        <Input
+                          type="date"
+                          value={item.periodFrom}
+                          onChange={(e) => updateLineItem(item.id, 'periodFrom', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <Label className="text-sm font-medium">Period To</Label>
+                        <Input
+                          type="date"
+                          value={item.periodTo}
+                          onChange={(e) => updateLineItem(item.id, 'periodTo', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

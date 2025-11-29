@@ -68,7 +68,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ isCollapsed, toggleSidebar }) =
     { icon: ReceiptIcon, label: "Expenses", href: "/expenses" },
     // { icon: BarChart3, label: "Reports", href: "/reports" },
     { icon: Users, label: "Contacts", href: "/contacts" },
-    { icon: Mail, label: "Email Templates", href: "/email-templates" },
+    // { icon: Mail, label: "Email Templates", href: "/email-templates" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
   const { user } = useAuth();

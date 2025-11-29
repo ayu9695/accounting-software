@@ -62,6 +62,13 @@ export interface Invoice {
   createdAt: string;
   updatedAt: string;
   remainingAmount: number;
+  bankAccountDetails?: {
+    accountName?: string;
+    accountNumber?: string;
+    bankName?: string;
+    ifscCode?: string;
+    branch?: string;
+  };
 }
 
 interface ViewInvoiceDialogProps {
@@ -87,13 +94,35 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
 }) => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const baseUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     if (open) {
       fetchDepartments();
+      fetchSettings();
     }
   }, [open]);
+
+  const fetchSettings = async () => {
+  try {
+    const res = await fetch(`${baseUrl}/settings`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to load settings');
+    const data = await res.json();
+    const sanitized = (data.bankAccountDetails || []).map((b: any) => ({
+      id: b._id || b.id || b.accountNumber,
+      accountName: b.accountName || '',
+      accountNumber: b.accountNumber || '',
+      bankName: b.bankName || '',
+      ifscCode: b.ifscCode || '',
+      branch: b.branch || '',
+      primaryAccount: !!b.primaryAccount
+    }));
+    setBankAccounts(sanitized);
+  } catch (err) {
+    console.error('Failed to fetch settings:', err);
+  }
+};
 
   const fetchDepartments = async () => {
     try {
@@ -129,7 +158,7 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
     
     setLoading(true);
     try {
-      const response = await fetch(`${baseUrl}/invoices/${invoice._id}/pdf`, {
+      const response = await fetch(`${baseUrl}/invoices/pdf/${invoice._id}`, {
         credentials: 'include'
       });
       
@@ -244,6 +273,40 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Bank Details */}
+          {invoice.bankAccountDetails && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg text-blue-700">Bank Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Account Name</Label>
+                    <p className="font-medium">{invoice.bankAccountDetails.accountName || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Account Number</Label>
+                    <p>{invoice.bankAccountDetails.accountNumber || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Bank Name</Label>
+                    <p>{invoice.bankAccountDetails.bankName || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">IFSC Code</Label>
+                    <p>{invoice.bankAccountDetails.ifscCode || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Branch</Label>
+                    <p>{invoice.bankAccountDetails.branch || '-'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
 
           {/* Client Information */}
           <Card>
@@ -410,6 +473,12 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
 
+    // NEW: bank accounts & selection
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState<string>('');
+  const [selectedBank, setSelectedBank] = useState<any | null>(null);
+
+
   const baseUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
@@ -417,8 +486,45 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
       loadInvoiceData();
       fetchClients();
       fetchDepartments();
+      fetchSettings();
     }
   }, [open, invoice]);
+
+    const fetchSettings = async () => {
+    try {
+      const res = await fetch(`${baseUrl}/settings`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch settings');
+      const data = await res.json();
+      const sanitized = (data.bankAccountDetails || []).map((b: any) => ({
+        id: b.accountNumber,
+        accountName: b.accountName || '',
+        accountNumber: b.accountNumber || '',
+        bankName: b.bankName || '',
+        ifscCode: b.ifscCode || '',
+        branch: b.branch || '',
+        primaryAccount: !!b.primaryAccount
+      }));
+      setBankAccounts(sanitized);
+    } catch (err) {
+      console.error('Failed to fetch settings:', err);
+    }
+  };
+
+    // Reset bank selection when dialog is closed or invoice changes to one without bank details
+  // useEffect(() => {
+  //   if (!open) {
+  //     // dialog closed -> ensure we clear selection so next open is fresh
+  //     setSelectedBank(null);
+  //     setSelectedBankId('');
+  //     return;
+  //   }
+
+  //   // If dialog opened with an invoice that has no bank details, clear selection
+  //   if (open && invoice && !invoice.bankAccountDetails) {
+  //     setSelectedBank(null);
+  //     setSelectedBankId('');
+  //   }
+  // }, [open, invoice]);
 
   const loadInvoiceData = () => {
     if (!invoice) return;
@@ -444,6 +550,79 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
       ...item,
       id: index.toString()
     })) as any);
+
+        // prefill selected bank from invoice if present (fallback)
+    // if (invoice.bankAccountDetails) {
+    //   setSelectedBank({
+    //     id: invoice.bankAccountDetails.accountNumber || '',
+    //     ...invoice.bankAccountDetails
+    //   });
+    //   setSelectedBankId(invoice.bankAccountDetails.accountNumber || '');
+    // } 
+    // else {
+    //   // IMPORTANT: clear previous selection when invoice has no bank details
+    //   setSelectedBank(null);
+    //   setSelectedBankId('');
+    // }
+  };
+
+    // When bankAccounts are available (or invoice changes), set the selected bank if invoice has bank details.
+  useEffect(() => {
+    if (!open) return; // only apply while dialog is open
+
+    // If invoice has bankAccountDetails we try to match with sanitized bankAccounts
+    if (invoice && invoice.bankAccountDetails) {
+      // Candidate ids that invoice might carry — try multiple fallbacks
+      const candidates = [
+        invoice.bankAccountDetails.accountNumber,
+        // the backend might store the _id instead, try that too if you have it:
+        (invoice.bankAccountDetails as any)._id,
+        invoice.bankAccountDetails.accountName,
+        invoice.bankAccountDetails.bankName
+      ].filter(Boolean).map(String);
+
+      // If bankAccounts already loaded, try to find a match
+      if (bankAccounts.length > 0) {
+        let matched = null;
+        for (const c of candidates) {
+          matched = bankAccounts.find(b => b.id === c || b.accountNumber === c || b.accountName === c || b.bankName === c);
+          if (matched) break;
+        }
+        if (matched) {
+          setSelectedBankId(matched.id);
+          setSelectedBank(matched);
+          return;
+        }
+      }
+
+      // If no match yet (bankAccounts not loaded or no match), set selectedBankId to '' so UI shows placeholder.
+      // We'll attempt again when bankAccounts array changes (this effect will re-run).
+      setSelectedBankId('');
+      setSelectedBank(null);
+      return;
+    }
+
+    // If invoice has no bank details — ensure selection is cleared
+    setSelectedBank(null);
+    setSelectedBankId('');
+  }, [open, invoice, bankAccounts]);
+
+
+    useEffect(() => {
+    if (bankAccounts.length > 0 && selectedBankId) {
+      const b = bankAccounts.find(x => x.id === selectedBankId);
+      if (b) setSelectedBank(b);
+    }
+  }, [bankAccounts, selectedBankId]);
+
+    const handleSelectBankById = (id: string) => {
+    setSelectedBankId(id);
+    const bank = bankAccounts.find(b => (b.id || '') === id) || null;
+    if (bank) {
+      setSelectedBank({ ...bank });
+    } else {
+      setSelectedBank(null);
+    }
   };
 
   const fetchClients = async () => {
@@ -527,6 +706,14 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
 
     setSaving(true);
 
+    const bankPayload = selectedBank ? {
+        accountName: selectedBank.accountName || '',
+        accountNumber: selectedBank.accountNumber || '',
+        bankName: selectedBank.bankName || '',
+        ifscCode: selectedBank.ifscCode || '',
+        branch: selectedBank.branch || ''
+      } : null;
+
     try {
       const updatedInvoiceData = {
         ...formData,
@@ -538,7 +725,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
         sgstAmount,
         igstAmount,
         totalTax,
-        total
+        total,
+        bankAccountDetails: bankPayload
       };
 
       if (!updatedInvoiceData.department) {
@@ -568,6 +756,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
       toast.error('Failed to update invoice');
     } finally {
       setSaving(false);
+      setSelectedBank(null);
+      setSelectedBankId('');
     }
   };
 
@@ -619,7 +809,7 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                     required
                   />
                 </div>
-                <div>
+                {/* <div>
                   <Label htmlFor="status">Status</Label>
                   <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
                     <SelectTrigger>
@@ -632,7 +822,7 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                       <SelectItem value="overdue">Overdue</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
                 <div>
                   <Label htmlFor="department">Department</Label>
                   <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
@@ -659,6 +849,99 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Bank Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-700">Bank Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Account Name dropdown */}
+                <div>
+                  <Label className="text-sm font-medium">Account Name</Label>
+                  <Select value={selectedBankId} onValueChange={(value) => handleSelectBankById(value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Account Name" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.length === 0 ? (
+                        // DON'T use SelectItem with value="" — render a plain message instead
+                        <div className="p-3 text-gray-500">No bank accounts</div>
+                      ) : bankAccounts.map((b, i) => {
+                        const id = String(b.id || `bank-${i}`); // safe non-empty id
+                        return (
+                          <SelectItem key={id} value={id}>
+                            {b.accountName} {/* change this to b.accountNumber or b.bankName for other selects */}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Account Number dropdown */}
+                <div>
+                  <Label className="text-sm font-medium">Account Number</Label>
+                  <Select value={selectedBankId} onValueChange={(value) => handleSelectBankById(value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Account Number" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.length === 0 ? (
+                        // DON'T use SelectItem with value="" — render a plain message instead
+                        <div className="p-3 text-gray-500">No bank accounts</div>
+                      ) : bankAccounts.map((b, i) => {
+                        const id = String(b.id || `bank-${i}`); // safe non-empty id
+                        return (
+                          <SelectItem key={id} value={id}>
+                            {b.accountNumber} {/* change this to b.accountNumber or b.bankName for other selects */}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Bank Name dropdown */}
+                <div>
+                  <Label className="text-sm font-medium">Bank Name</Label>
+                  <Select value={selectedBankId} onValueChange={(value) => handleSelectBankById(value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Bank Name" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.length === 0 ? (
+                        // DON'T use SelectItem with value="" — render a plain message instead
+                        <div className="p-3 text-gray-500">No bank accounts</div>
+                      ) : bankAccounts.map((b, i) => {
+                        const id = String(b.id || `bank-${i}`); // safe non-empty id
+                        return (
+                          <SelectItem key={id} value={id}>
+                            {b.bankName} {/* change this to b.accountNumber or b.bankName for other selects */}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* IFSC / Branch read-only */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">IFSC Code</Label>
+                  <Input value={selectedBank?.ifscCode || ''} readOnly className="mt-1 bg-gray-100 cursor-not-allowed" />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Branch</Label>
+                  <Input value={selectedBank?.branch || ''} readOnly className="mt-1 bg-gray-100 cursor-not-allowed" />
+                </div>
+                <div></div>
+              </div>
+            </CardContent>
+          </Card>
+
 
           {/* Line Items */}
           <Card>
