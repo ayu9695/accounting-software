@@ -818,7 +818,7 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
                           className="mt-1"
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-3">
                         <Label className="text-sm font-medium">Rate</Label>
                         <Input
                           type="number"
@@ -857,7 +857,8 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
                         )}
                       </div>
                     </div>
-                    <div className="col-span-2">
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                    <div className="col-span-5">
                         <Label className="text-sm font-medium">Rate Type</Label>
                         <Select 
                           value={item.rateType} 
@@ -873,7 +874,7 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
                         </Select>
                       </div>
                     {/* Row 2: Conditional Fields (Hours OR LOP & Extra Days) + Amount */}
-                    <div className="grid grid-cols-12 gap-3 items-end">
+                    {/* <div className="grid grid-cols-12 gap-3 items-end"> */}
                       {item.rateType === 'hourly' ? (
                         <>
                           <div className="col-span-3">
@@ -921,7 +922,7 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
 
                     {/* Row 3: Resource Name, Period From, Period To */}
                     <div className="grid grid-cols-12 gap-3">
-                      <div className="col-span-4">
+                      <div className="col-span-5">
                         <Label className="text-sm font-medium">Resource Name</Label>
                         <Input
                           value={item.resourceName}
@@ -930,7 +931,7 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
                           className="mt-1"
                         />
                       </div>
-                      <div className="col-span-4">
+                      <div className="col-span-2">
                         <Label className="text-sm font-medium">Period From</Label>
                         <Input
                           type="date"
@@ -939,7 +940,7 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
                           className="mt-1"
                         />
                       </div>
-                      <div className="col-span-4">
+                      <div className="col-span-2">
                         <Label className="text-sm font-medium">Period To</Label>
                         <Input
                           type="date"
