@@ -358,8 +358,7 @@ const VendorBills: React.FC = () => {
                           <TableCell className="text-right">₹ {bill.payableAmount.toLocaleString()}</TableCell>
                           <TableCell className="text-right">₹ {bill.tdsAmount} ({bill.tdsRate}%)</TableCell>
                           <TableCell className="text-right">₹ {bill.pendingAmount}</TableCell>
-                          {/* <TableCell>{bill.paymentDate ? formatDate(bill.paymentDate) : '-'}</TableCell> */}
-                          <TableCell>{bill.paymentDate ? bill.paymentDate.toString() : '-'}</TableCell>
+                          <TableCell>{bill.paymentDate ? formatDate(bill.paymentDate) : '-'}</TableCell>
                           <TableCell>
                             <Badge className={getStatusBadge(bill.paymentStatus)}>
                               {bill.paymentStatus}

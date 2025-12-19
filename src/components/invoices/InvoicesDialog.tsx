@@ -14,9 +14,15 @@ import { toast } from "sonner";
 interface LineItem {
   id: string;
   description: string;
-  quantity: number;
+  rateType: 'hourly' | 'monthly';
+  hours?: number; // Only for hourly
+  lop?: number; // Only for monthly
+  extraDays?: number; // Only for monthly
   rate: number;
   amount: number;
+  resourceName: string;
+  periodFrom: string;
+  periodTo: string;
 }
 
 interface Client {
@@ -330,29 +336,86 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">Description</th>
-                      <th className="text-center py-2">Quantity</th>
-                      <th className="text-right py-2">Rate</th>
-                      <th className="text-right py-2">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoice.lineItems.map((item, index) => (
-                      <tr key={index} className="border-b">
-                        <td className="py-3">
-                          {item.id && <div className="font-medium">{item.id}</div>}
-                          <div className="text-gray-600">{item.description}</div>
-                        </td>
-                        <td className="text-center py-3">{item.quantity}</td>
-                        <td className="text-right py-3">₹{item.rate.toFixed(2)}</td>
-                        <td className="text-right py-3 font-medium">₹{item.amount.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {(() => {
+                  // Helper to normalize line item fields (backend may use different field names)
+                  const normalizeItem = (item: any) => ({
+                    description: item.description || '',
+                    resourceName: item.resourceName || item.resource_name || '',
+                    rateType: item.rateType || item.rate_type || '',
+                    hours: item.hours ?? item.numberOfHours ?? item.number_of_hours ?? null,
+                    periodFrom: item.periodFrom || item.period_from || '',
+                    periodTo: item.periodTo || item.period_to || '',
+                    rate: item.rate ?? 0,
+                    amount: item.amount ?? 0,
+                  });
+
+                  // Helper to calculate total days between two dates
+                  const calculateTotalDays = (from: string, to: string) => {
+                    if (!from || !to) return null;
+                    const fromDate = new Date(from);
+                    const toDate = new Date(to);
+                    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return null;
+                    const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
+                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+                  };
+
+                  // Normalize all items first
+                  const normalizedItems = invoice.lineItems.map(normalizeItem);
+
+                  // Check if any item needs the quantity column
+                  const hasHourlyItems = normalizedItems.some(item => item.rateType === 'hourly' && item.hours && item.hours > 0);
+                  const hasMonthlyWithDays = normalizedItems.some(item => item.rateType === 'monthly' && item.periodFrom && item.periodTo);
+                  const showQtyColumn = hasHourlyItems || hasMonthlyWithDays;
+
+                  // Determine column header
+                  const qtyColumnHeader = hasHourlyItems && !hasMonthlyWithDays 
+                    ? 'Number of Hours' 
+                    : !hasHourlyItems && hasMonthlyWithDays 
+                      ? 'Total Days' 
+                      : 'Qty/Days';
+
+                  return (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2">Service</th>
+                          {showQtyColumn && <th className="text-center py-2">{qtyColumnHeader}</th>}
+                          <th className="text-right py-2">Rate</th>
+                          <th className="text-right py-2">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {normalizedItems.map((item, index) => {
+                          const totalDays = item.rateType === 'monthly' ? calculateTotalDays(item.periodFrom, item.periodTo) : null;
+                          
+                          return (
+                            <tr key={index} className="border-b">
+                              <td className="py-3">
+                                <div className="font-medium">{item.description}</div>
+                                {item.resourceName && (
+                                  <div className="text-sm text-gray-500">{item.resourceName}</div>
+                                )}
+                              </td>
+                              {showQtyColumn && (
+                                <td className="text-center py-3">
+                                  {item.rateType === 'hourly' && item.hours ? (
+                                    <span>{item.hours}</span>
+                                  ) : item.rateType === 'monthly' && totalDays ? (
+                                    <span>{totalDays}</span>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              )}
+                              <td className="text-right py-3">₹{Number(item.rate)?.toFixed(2) || '0.00'}</td>
+                              <td className="text-right py-3 font-medium">₹{Number(item.amount)?.toFixed(2) || '0.00'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  );
+                })()}
               </div>
 
               <Separator className="my-4" />
@@ -490,6 +553,32 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
     }
   }, [open, invoice]);
 
+  // normalize invoice.lineItems from server -> FE LineItem shape
+  const normalizeServerLineItemsToFE = (items: any[] = []): LineItem[] => {
+    return items.map((it: any, idx: number) => {
+      // keep server's id if present or fallback to index-based id
+      const id = it.id ?? it._id ?? String(Date.now()) + '-' + idx;
+      // server may store numberOfHours, map to hours
+      const hours = it.hours ?? it.numberOfHours ?? (it.number_of_hours ?? undefined);
+      const lop = it.lop ?? (it.lossOfPay ?? undefined);
+      const extraDays = it.extraDays ?? (it.extra_days ?? undefined);
+      const rateType = (it.rateType || it.rate_type || 'monthly');
+      return {
+        id: String(id),
+        description: it.description || '',
+        rateType: rateType === 'hourly' ? 'hourly' : 'monthly',
+        hours: hours !== undefined ? Number(hours) : undefined,
+        lop: lop !== undefined ? Number(lop) : undefined,
+        extraDays: extraDays !== undefined ? Number(extraDays) : undefined,
+        rate: it.rate !== undefined ? Number(it.rate) : 0,
+        amount: it.amount !== undefined ? Number(it.amount) : 0,
+        resourceName: it.resourceName || it.resource_name || '',
+        periodFrom: it.periodFrom ? new Date(it.periodFrom).toISOString().split('T')[0] : '',
+        periodTo: it.periodTo ? new Date(it.periodTo).toISOString().split('T')[0] : ''
+      } as LineItem;
+    });
+  };
+
     const fetchSettings = async () => {
     try {
       const res = await fetch(`${baseUrl}/settings`, { credentials: 'include' });
@@ -526,45 +615,45 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
   //   }
   // }, [open, invoice]);
 
-  const loadInvoiceData = () => {
-    if (!invoice) return;
+  // const loadInvoiceData = () => {
+  //   if (!invoice) return;
 
-    setFormData({
-      clientName: invoice.clientName,
-      clientId: invoice.clientId,
-      department: invoice.department,
-      invoiceNumber: invoice.invoiceNumber,
-      issueDate: invoice.issueDate.split('T')[0],
-      dueDate: invoice.dueDate.split('T')[0],
-      hsnCode: invoice.hsnCode || "",
-      currency: invoice.currency,
-      cgst: invoice.cgst,
-      sgst: invoice.sgst,
-      igst: invoice.igst,
-      discount: invoice.discount,
-      notes: invoice.notes || "",
-      status: invoice.status
-    });
+  //   setFormData({
+  //     clientName: invoice.clientName,
+  //     clientId: invoice.clientId,
+  //     department: invoice.department,
+  //     invoiceNumber: invoice.invoiceNumber,
+  //     issueDate: invoice.issueDate.split('T')[0],
+  //     dueDate: invoice.dueDate.split('T')[0],
+  //     hsnCode: invoice.hsnCode || "",
+  //     currency: invoice.currency,
+  //     cgst: invoice.cgst,
+  //     sgst: invoice.sgst,
+  //     igst: invoice.igst,
+  //     discount: invoice.discount,
+  //     notes: invoice.notes || "",
+  //     status: invoice.status
+  //   });
 
-    setLineItems(invoice.lineItems.map((item, index) => ({
-      ...item,
-      id: index.toString()
-    })) as any);
+  //   setLineItems(invoice.lineItems.map((item, index) => ({
+  //     ...item,
+  //     id: index.toString()
+  //   })) as any);
 
-        // prefill selected bank from invoice if present (fallback)
-    // if (invoice.bankAccountDetails) {
-    //   setSelectedBank({
-    //     id: invoice.bankAccountDetails.accountNumber || '',
-    //     ...invoice.bankAccountDetails
-    //   });
-    //   setSelectedBankId(invoice.bankAccountDetails.accountNumber || '');
-    // } 
-    // else {
-    //   // IMPORTANT: clear previous selection when invoice has no bank details
-    //   setSelectedBank(null);
-    //   setSelectedBankId('');
-    // }
-  };
+  //       // prefill selected bank from invoice if present (fallback)
+  //   // if (invoice.bankAccountDetails) {
+  //   //   setSelectedBank({
+  //   //     id: invoice.bankAccountDetails.accountNumber || '',
+  //   //     ...invoice.bankAccountDetails
+  //   //   });
+  //   //   setSelectedBankId(invoice.bankAccountDetails.accountNumber || '');
+  //   // } 
+  //   // else {
+  //   //   // IMPORTANT: clear previous selection when invoice has no bank details
+  //   //   setSelectedBank(null);
+  //   //   setSelectedBankId('');
+  //   // }
+  // };
 
     // When bankAccounts are available (or invoice changes), set the selected bank if invoice has bank details.
   useEffect(() => {
@@ -651,12 +740,77 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
     }
   };
 
-  const updateLineItem = (index: number, field: keyof LineItem, value: string | number) => {
-    setLineItems(items => items.map((item, i) => {
-      if (i === index) {
-        const updated = { ...item, [field]: value };
-        if (field === 'quantity' || field === 'rate') {
-          updated.amount = Number(updated.quantity) * Number(updated.rate);
+  const loadInvoiceData = () => {
+    if (!invoice) return;
+
+    setFormData({
+      clientName: invoice.clientName,
+      clientId: invoice.clientId,
+      department: invoice.department,
+      invoiceNumber: invoice.invoiceNumber,
+      issueDate: invoice.issueDate ? invoice.issueDate.split('T')[0] : '',
+      dueDate: invoice.dueDate ? invoice.dueDate.split('T')[0] : '',
+      hsnCode: invoice.hsnCode || "",
+      currency: invoice.currency,
+      cgst: invoice.cgst,
+      sgst: invoice.sgst,
+      igst: invoice.igst,
+      discount: invoice.discount,
+      notes: invoice.notes || "",
+      status: invoice.status
+    });
+
+    // Normalize line items from server shape -> FE shape used in CreateInvoiceForm
+    setLineItems(normalizeServerLineItemsToFE(invoice.lineItems || []));
+
+    // preselect bank if invoice has bankAccountDetails (try matching by accountNumber or id)
+    if (invoice.bankAccountDetails) {
+      const candidates = [
+        invoice.bankAccountDetails.accountNumber,
+        (invoice.bankAccountDetails as any)._id,
+        invoice.bankAccountDetails.accountName,
+        invoice.bankAccountDetails.bankName
+      ].filter(Boolean).map(String);
+
+      // try to match against previously fetched bankAccounts
+      const match = bankAccounts.find(b =>
+        candidates.includes(String(b.id)) ||
+        candidates.includes(String(b.accountNumber)) ||
+        candidates.includes(String(b.accountName))
+      );
+      if (match) {
+        setSelectedBankId(match.id);
+        setSelectedBank(match);
+      } else {
+        // will try to match after bankAccounts loaded
+        setSelectedBankId('');
+        setSelectedBank(null);
+      }
+    } else {
+      setSelectedBank(null);
+      setSelectedBankId('');
+    }
+  };
+
+  // updateLineItem expects id (unchanged from create form)
+  const updateLineItem = (id: string, field: keyof LineItem, value: string | number) => {
+    setLineItems(items => items.map(item => {
+      if (item.id === id) {
+        const updated = { ...item, [field]: value } as any;
+        if (field === 'rateType') {
+          if (value === 'hourly') {
+            delete updated.lop;
+            delete updated.extraDays;
+            updated.hours = updated.hours ?? 0;
+          } else {
+            delete updated.hours;
+            updated.lop = updated.lop ?? 0;
+            updated.extraDays = updated.extraDays ?? 0;
+          }
+        }
+        // ensure numeric fields remain numbers
+        if (['rate', 'amount', 'hours', 'lop', 'extraDays'].includes(String(field))) {
+          updated[field] = typeof value === 'string' ? Number(value || 0) : value;
         }
         return updated;
       }
@@ -666,18 +820,21 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
 
   const addLineItem = () => {
     const newItem: LineItem = {
-        id:"",
+      id: Date.now().toString(),
       description: "",
-      quantity: 1,
+      rateType: 'monthly',
       rate: 0,
-      amount: 0
+      amount: 0,
+      resourceName: "",
+      periodFrom: "",
+      periodTo: ""
     };
     setLineItems([...lineItems, newItem]);
   };
 
-  const removeLineItem = (index: number) => {
+  const removeLineItem = (id: string) => {
     if (lineItems.length > 1) {
-      setLineItems(lineItems.filter((_, i) => i !== index));
+      setLineItems(prev => prev.filter(it => it.id !== id));
     }
   };
 
@@ -690,6 +847,28 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
   const igstAmount = (taxableAmount * formData.igst) / 100;
   const totalTax = cgstAmount + sgstAmount + igstAmount;
   const total = taxableAmount + totalTax;
+
+   const normalizeFEToServerLineItems = (items: LineItem[]) => {
+    return items.map(it => {
+      const out: any = {
+        description: it.description,
+        rate: Number(it.rate || 0),
+        amount: Number(it.amount || 0),
+        resourceName: it.resourceName,
+        periodFrom: it.periodFrom ? new Date(it.periodFrom).toISOString() : null,
+        periodTo: it.periodTo ? new Date(it.periodTo).toISOString() : null,
+        rateType: it.rateType
+      };
+      // hours -> numberOfHours for backend
+      if (it.rateType === 'hourly') {
+        if (it.hours !== undefined) out.numberOfHours = Number(it.hours);
+      } else {
+        if (it.lop !== undefined) out.lop = Number(it.lop);
+        if (it.extraDays !== undefined) out.extraDays = Number(it.extraDays);
+      }
+      return out;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -717,7 +896,7 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
     try {
       const updatedInvoiceData = {
         ...formData,
-        lineItems: lineItems.map(({ id, ...item }) => item),
+        lineItems: normalizeFEToServerLineItems(lineItems),
         subtotal,
         discountAmount,
         taxableAmount,
@@ -944,7 +1123,7 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
 
 
           {/* Line Items */}
-          <Card>
+          {/* <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg text-blue-700">Line Items</CardTitle>
               <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
@@ -964,16 +1143,6 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                         placeholder="Item description"
                         className="mt-1"
                         required
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-sm font-medium">Qty</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                        className="mt-1"
                       />
                     </div>
                     <div className="col-span-2">
@@ -1006,6 +1175,158 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card> */}
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg text-blue-700">Line Items</CardTitle>
+              <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {lineItems.map((item) => (
+                  <div key={item.id} className="p-4 border rounded-lg bg-gray-50 space-y-4">
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                      <div className="col-span-5">
+                        <Label className="text-sm font-medium">Description *</Label>
+                        <Input
+                          value={item.description}
+                          onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
+                          placeholder="Enter item description"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-sm font-medium">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.rate}
+                          onChange={(e) => updateLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-sm font-medium">Amount</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.amount}
+                          onChange={(e) => updateLineItem(item.id, 'amount', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        {lineItems.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLineItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-3 items-end">
+                      <div className="col-span-5">
+                        <Label className="text-sm font-medium">Rate Type</Label>
+                        <Select
+                          value={item.rateType}
+                          onValueChange={(value: 'hourly' | 'monthly') => updateLineItem(item.id, 'rateType', value)}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hourly">Hourly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {item.rateType === 'hourly' ? (
+                        <>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">Hours</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.hours ?? 0}
+                              onChange={(e) => updateLineItem(item.id, 'hours', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-6" />
+                        </>
+                      ) : (
+                        <>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">LOP</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.lop ?? 0}
+                              onChange={(e) => updateLineItem(item.id, 'lop', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Label className="text-sm font-medium">Extra Days</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.extraDays ?? 0}
+                              onChange={(e) => updateLineItem(item.id, 'extraDays', parseFloat(e.target.value) || 0)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-3" />
+                        </>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-3">
+                      <div className="col-span-5">
+                        <Label className="text-sm font-medium">Resource Name</Label>
+                        <Input
+                          value={item.resourceName}
+                          onChange={(e) => updateLineItem(item.id, 'resourceName', e.target.value)}
+                          placeholder="Enter resource name"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-sm font-medium">Period From</Label>
+                        <Input
+                          type="date"
+                          value={item.periodFrom}
+                          onChange={(e) => updateLineItem(item.id, 'periodFrom', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-sm font-medium">Period To</Label>
+                        <Input
+                          type="date"
+                          value={item.periodTo}
+                          onChange={(e) => updateLineItem(item.id, 'periodTo', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

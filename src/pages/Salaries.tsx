@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,43 +13,115 @@ import { Link } from "react-router-dom";
 import { Toast } from "@radix-ui/react-toast";
 import { toast } from "sonner";
 
+interface Department {
+  _id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 const Salaries: React.FC = () => {
   const { allEmployees } = useEmployees();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [salaryPayments, setSalaryPayments] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalSum, setTotalSum] = useState<number>(0);
+  const [paidSum, setPaidSum] = useState<number>(0);
 
   const baseUrl = import.meta.env.VITE_API_URL;
 
-
-    useEffect(() => {
-      const fetchSettings = async () => {
-        try {
-          const response = await fetch(`${baseUrl}/salaries/${selectedMonth}${selectedYear}`, {
-            method: 'GET',
-            credentials: 'include', // 🔑 This makes the browser send cookies
-          });
-  
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Error ${response.status}: ${errorText}`);
-          }
-  
-          const data = await response.json();
-          console.log('Fetched settings:', data);
-          setSalaryPayments(data);
-        } catch (err: any) {
-          console.error('Failed to fetch settings:', err);
-          toast(err.message);
-        } finally {
-          setLoading(false);
+  // Fetch departments on mount
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/departments`, {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch departments');
         }
-      };
+        
+        const data = await response.json();
+        setDepartments(data);
+      } catch (err: any) {
+        console.error('Failed to fetch departments:', err);
+        toast.error('Failed to load departments');
+      }
+    };
+
+    fetchDepartments();
+  }, [baseUrl]);
+
+  // Create department map for quick lookup
+  const departmentMap = useMemo(() => {
+    const map = new Map<string, string>();
+    departments.forEach(dept => map.set(dept._id, dept.name));
+    return map;
+  }, [departments]);
+
+
+  useEffect(() => {
+    const fetchSalaries = async () => {
+      setLoading(true);
+      try {
+        // Convert month from 0-based (0-11) to 1-based (1-12) and zero-pad
+        const monthNumber = (parseInt(selectedMonth) + 1).toString().padStart(2, '0');
+        const endpoint = `${baseUrl}/salaries/${monthNumber}${selectedYear}`;
+        
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          credentials: 'include',
+        });
   
-      fetchSettings();
-    }, []);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+  
+        const data = await response.json();
+        console.log('Fetched salaries raw response:', data);
+        
+        // Extract salaries array and sum values from response
+        const salariesArray = data.salaries || [];
+        console.log('Salaries array:', salariesArray);
+        console.log('Department map at fetch time:', departmentMap);
+        console.log('Department map size:', departmentMap.size);
+        console.log('Raw department values:', salariesArray.map((p: any) => p.department));
+        
+        setTotalSum(data.sum || 0);
+        setPaidSum(data.paidSum || 0);
+        
+        // Transform salary payments to include department names
+        const transformedData = Array.isArray(salariesArray) ? salariesArray.map((payment: any) => ({
+          ...payment,
+          department: payment.department 
+            ? (departmentMap.get(payment.department) || payment.department)
+            : payment.department
+        })) : [];
+        
+        console.log('Transformed data with departments:', transformedData.map((p: any) => ({ name: p.employeeName, department: p.department })));
+        
+        setSalaryPayments(transformedData);
+      } catch (err: any) {
+        console.error('Failed to fetch salaries:', err);
+        toast.error(err.message || 'Failed to fetch salaries');
+        setSalaryPayments([]);
+        setTotalSum(0);
+        setPaidSum(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    fetchSalaries();
+  }, [selectedMonth, selectedYear, baseUrl, departmentMap]);
 
   const months = [
     { value: "0", label: "January" },
@@ -79,8 +151,42 @@ const Salaries: React.FC = () => {
     ));
   };
 
-  const handleBulkProcess = (processedSalaries: any[]) => {
-    setSalaryPayments(prev => [...prev, ...processedSalaries]);
+  const handleBulkProcess = async () => {
+    // Refetch salaries after bulk processing
+    setLoading(true);
+    try {
+      const monthNumber = (parseInt(selectedMonth) + 1).toString().padStart(2, '0');
+      const endpoint = `${baseUrl}/salaries/${monthNumber}${selectedYear}`;
+      
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refetch salaries');
+      }
+
+      const data = await response.json();
+      
+      // Extract salaries array and sum values from response
+      const salariesArray = data.salaries || [];
+      setTotalSum(data.sum || 0);
+      setPaidSum(data.paidSum || 0);
+      
+      const transformedData = Array.isArray(salariesArray) ? salariesArray.map((payment: any) => ({
+        ...payment,
+        department: payment.department 
+          ? (departmentMap.get(payment.department) || payment.department)
+          : payment.department
+      })) : [];
+      
+      setSalaryPayments(transformedData);
+    } catch (err: any) {
+      console.error('Failed to refetch salaries:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const currentMonthName = months.find(m => m.value === selectedMonth)?.label;
@@ -171,13 +277,12 @@ const Salaries: React.FC = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
                 <Receipt className="h-4 w-4" />
-                {currentMonthName} Payments
+                Paid Salaries
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-900">
-                {/* {currentPayments.filter(p => p.status === 'paid').length} */}
-                paid salaries
+                ₹{paidSum.toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -191,8 +296,7 @@ const Salaries: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-900">
-                {/* ₹{currentPayments.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()} */}
-                sum of salaries
+                ₹{totalSum.toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -214,11 +318,21 @@ const Salaries: React.FC = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {salaryPayments.length > 0 ? (
-                  <SalaryPaymentTable 
-                    payments={salaryPayments}
-                    onUpdatePayment={handleUpdatePayment}
-                  />
+                {loading ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Calculator className="mx-auto h-12 w-12 mb-4 animate-pulse" />
+                    <p>Loading salaries for {currentMonthName} {selectedYear}...</p>
+                  </div>
+                ) : salaryPayments.length > 0 ? (
+                  <>
+                    {console.log('SalaryPayments data sent to table:', salaryPayments)}
+                    {console.log('Department map:', departmentMap)}
+                    {console.log('Sample payment department field:', salaryPayments[0]?.department)}
+                    <SalaryPaymentTable 
+                      payments={salaryPayments}
+                      onUpdatePayment={handleUpdatePayment}
+                    />
+                  </>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <Calculator className="mx-auto h-12 w-12 mb-4" />
@@ -248,14 +362,14 @@ const Salaries: React.FC = () => {
                   <Button 
                     onClick={() => setBulkDialogOpen(true)}
                     className="bg-blue-600 hover:bg-blue-700"
-                    disabled={allEmployees.length === 0}
+                    disabled={salaryPayments.filter(s => s.status !== 'paid').length === 0}
                   >
                     <Calculator className="mr-2 h-4 w-4" />
                     Start Bulk Processing
                   </Button>
-                  {allEmployees.length === 0 && (
-                    <p className="text-sm text-red-600 mt-2">
-                      Please add team members first to process salaries
+                  {salaryPayments.filter(s => s.status !== 'paid').length === 0 && (
+                    <p className="text-sm text-orange-600 mt-2">
+                      No pending salaries to process for this month
                     </p>
                   )}
                 </div>
@@ -267,7 +381,7 @@ const Salaries: React.FC = () => {
         <BulkSalaryDialog
           open={bulkDialogOpen}
           onOpenChange={setBulkDialogOpen}
-          employees={allEmployees}
+          salaryRecords={salaryPayments}
           month={selectedMonth}
           year={selectedYear}
           onProcess={handleBulkProcess}

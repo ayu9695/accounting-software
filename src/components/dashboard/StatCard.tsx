@@ -11,6 +11,7 @@ interface StatCardProps {
     value: number;
     isPositive: boolean;
   };
+  subContent?: React.ReactNode;
   className?: string;
 }
 
@@ -19,6 +20,7 @@ const StatCard: React.FC<StatCardProps> = ({
   value,
   icon,
   trend,
+  subContent,
   className,
 }) => {
   return (
@@ -28,6 +30,11 @@ const StatCard: React.FC<StatCardProps> = ({
           <div>
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
             <h3 className="text-2xl font-bold mt-1">{value}</h3>
+            {subContent && (
+              <div className="mt-1">
+                {subContent}
+              </div>
+            )}
             {trend && (
               <div className="flex items-center mt-2">
                 <span

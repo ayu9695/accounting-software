@@ -191,6 +191,75 @@ const Invoices: React.FC = () => {
   const paidAmount = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total, 0);
   const pendingAmount = filteredInvoices.filter(i => i.status !== 'paid').reduce((sum, i) => sum + i.total, 0);
 
+  // Export to CSV functionality
+  const exportToCSV = () => {
+    if (filteredInvoices.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no invoices to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      'Invoice Number',
+      'Client',
+      'Issue Date',
+      'Due Date',
+      'Amount',
+      'Pending Amount',
+      'Status'
+    ];
+
+    // Format date helper
+    const formatDateForCSV = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    };
+
+    // Convert invoices to CSV rows
+    const rows = filteredInvoices.map(invoice => [
+      invoice.invoiceNumber,
+      `"${invoice.clientName}"`, // Wrap in quotes to handle commas in names
+      formatDateForCSV(invoice.issueDate),
+      formatDateForCSV(invoice.dueDate),
+      invoice.total,
+      invoice.remainingAmount || 0,
+      invoice.status.toUpperCase()
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    // Generate filename with current date
+    const today = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `invoices_export_${today}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Export successful",
+      description: `${filteredInvoices.length} invoices exported to CSV.`,
+    });
+  };
+
   return (
     <PageLayout title="Invoices">
       <div className="mb-6 flex items-center justify-between">
@@ -311,7 +380,7 @@ const Invoices: React.FC = () => {
               </div>
             </DialogContent>
           </Dialog>
-          <Button variant="outline"><Download className="mr-2 h-4 w-4" />Export</Button>
+          <Button variant="outline" onClick={exportToCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
           <Button onClick={() => setCreateDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Create Invoice</Button>
         </div>
       </div>

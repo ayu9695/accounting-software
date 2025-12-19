@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -9,86 +9,120 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Loader2, CheckCircle2 } from "lucide-react";
 
-interface Payment {
+interface Expense {
   id: string;
-  name: string;
-  amount: string;
-  dueDate: string;
-  daysLeft: number;
+  _id?: string;
+  category: string;
+  amount: number;
+  currency: string;
+  paymentStatus: boolean;
+  approvalStatus: boolean;
+  expenseDate: string;
+  description: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const payments: Payment[] = [
-  {
-    id: "PAY-001",
-    name: "Office Rent",
-    amount: "$2,400.00",
-    dueDate: "April 30, 2025",
-    daysLeft: 15,
-  },
-  {
-    id: "PAY-002",
-    name: "Internet Service",
-    amount: "$99.00",
-    dueDate: "April 22, 2025",
-    daysLeft: 7,
-  },
-  {
-    id: "PAY-003",
-    name: "Software Subscription",
-    amount: "$49.00",
-    dueDate: "April 20, 2025",
-    daysLeft: 5,
-  },
-  {
-    id: "PAY-004",
-    name: "Contractor Payment",
-    amount: "$1,200.00",
-    dueDate: "April 18, 2025",
-    daysLeft: 3,
-  },
-];
+// Currency symbols map
+const currencySymbols: { [key: string]: string } = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  INR: '₹',
+};
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
 const UpcomingPayments: React.FC = () => {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [count, setCount] = useState(0);
+  
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+  useEffect(() => {
+    const fetchUnpaidExpenses = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`${baseUrl}/expenses/filter/unpaid`, {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch expenses');
+        
+        const data = await response.json();
+        setExpenses(data.expenses || []);
+        setCount(data.count || 0);
+      } catch (error) {
+        console.error('Error fetching unpaid expenses:', error);
+        setExpenses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUnpaidExpenses();
+  }, [baseUrl]);
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Upcoming Payments</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-lg">Upcoming Payments</CardTitle>
+          {!loading && count > 0 && (
+            <span className="text-sm text-muted-foreground">({count} pending)</span>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Due Date</TableHead>
-              <TableHead className="text-right">Days Left</TableHead>
-            </TableRow>
-          </TableHeader>
-          {/* <TableBody>
-            {payments.map((payment) => (
-              <TableRow key={payment.id}>
-                <TableCell className="font-medium">{payment.name}</TableCell>
-                <TableCell className="text-right">{payment.amount}</TableCell>
-                <TableCell className="text-right">{payment.dueDate}</TableCell>
-                <TableCell className="text-right">
-                  <span
-                    className={
-                      payment.daysLeft <= 3
-                        ? "text-accounting-danger font-medium"
-                        : payment.daysLeft <= 7
-                        ? "text-accounting-warning font-medium"
-                        : ""
-                    }
-                  >
-                    {payment.daysLeft} days
-                  </span>
-                </TableCell>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          </div>
+        ) : expenses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <CheckCircle2 className="h-12 w-12 text-green-500 mb-3" />
+            <p className="text-lg font-medium text-gray-700">You're all caught up!</p>
+            <p className="text-sm text-muted-foreground">No upcoming payments</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Date</TableHead>
               </TableRow>
-            ))}
-          </TableBody> */}
-          COMING SOON
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {expenses.slice(0, 5).map((expense) => (
+                <TableRow key={expense.id || expense._id}>
+                  <TableCell className="font-medium">{expense.category}</TableCell>
+                  <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                    {expense.description}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {currencySymbols[expense.currency] || expense.currency} {expense.amount.toLocaleString('en-IN')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatDate(expense.expenseDate)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );
