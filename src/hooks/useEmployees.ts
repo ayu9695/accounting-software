@@ -1,13 +1,25 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Employee, SalaryRecord, SearchFilters, PaginationData } from '@/types';
 import { mockEmployees, mockSalaryRecords } from '@/data/mockData';
 import { getDaysInMonth, getWorkingDaysInMonth } from '@/utils/calculations';
 
+interface Department {
+  _id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const useEmployees = () => {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const [rawEmployees, setRawEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [salaryRecords, setSalaryRecords] = useState<SalaryRecord[]>(mockSalaryRecords);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<SearchFilters>({ query: '' });
   const [pagination, setPagination] = useState<PaginationData>({
     page: 1,
@@ -15,6 +27,100 @@ export const useEmployees = () => {
     total: 0,
     totalPages: 0
   });
+
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+  // Fetch departments
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/departments`, {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch departments');
+        }
+        
+        const data = await response.json();
+        setDepartments(data);
+      } catch (err) {
+        console.error('Failed to fetch departments:', err);
+      }
+    };
+
+    fetchDepartments();
+  }, [baseUrl]);
+
+  // Create department map for quick lookup
+  const departmentMap = useMemo(() => {
+    const map = new Map<string, string>();
+    departments.forEach(dept => map.set(dept._id, dept.name));
+    return map;
+  }, [departments]);
+
+  // Fetch employees from API
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`${baseUrl}/employees`, {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch employees');
+        }
+        
+        const data = await response.json();
+        setRawEmployees(data);
+      } catch (err) {
+        console.error('Failed to fetch employees:', err);
+        // Fallback to mock data on error
+        setRawEmployees(mockEmployees.map(emp => ({ ...emp, _id: emp.id })));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, [baseUrl]);
+
+  // Transform employees whenever rawEmployees or departmentMap changes
+  useEffect(() => {
+    if (rawEmployees.length === 0) return;
+
+    const transformedEmployees: Employee[] = rawEmployees.map((emp: any) => {
+      const departmentId = emp.department;
+      let departmentName = departmentId || '';
+      
+      // Try to get department name from map
+      if (departmentId && departmentMap.size > 0) {
+        const mappedName = departmentMap.get(departmentId);
+        if (mappedName) {
+          departmentName = mappedName;
+        } else {
+          // If not found in map, keep the ID (might be a name already or invalid ID)
+          departmentName = departmentId;
+        }
+      }
+
+      return {
+        id: emp._id || emp.id,
+        name: emp.name,
+        email: emp.email,
+        department: departmentName,
+        position: emp.position || emp.designation || '',
+        baseSalary: emp.baseSalary || 0,
+        allowances: emp.allowances || [],
+        deductions: emp.deductions || [],
+        joinDate: emp.joinDate || emp.createdAt || '',
+        isActive: emp.isActive !== undefined ? emp.isActive : true
+      };
+    });
+    
+    setEmployees(transformedEmployees);
+  }, [rawEmployees, departmentMap]);
 
   const filteredEmployees = employees.filter(employee => {
     if (filters.query) {
