@@ -1,9 +1,10 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Edit2, CheckCircle } from "lucide-react";
+import { SingleSalaryPaymentDialog } from "./SingleSalaryPaymentDialog";
 
 interface SalaryPayment {
   id?: string;
@@ -24,6 +25,9 @@ interface SalaryPayment {
   leaveDays?: number;
   month?: string;
   year?: number;
+  defaultWorkingDays?: number;
+  paymentMethod?: string;
+  paidOn?: string;
 }
 
 interface SalaryPaymentTableProps {
@@ -35,14 +39,16 @@ export const SalaryPaymentTable: React.FC<SalaryPaymentTableProps> = ({
   payments, 
   onUpdatePayment 
 }) => {
-  const markAsPaid = (payment: SalaryPayment) => {
-    const paymentId = payment.id || payment._id;
-    if (paymentId) {
-      onUpdatePayment(paymentId, {
-        status: "paid",
-        paymentDate: new Date().toISOString().split('T')[0]
-      });
-    }
+  const [selectedPayment, setSelectedPayment] = useState<SalaryPayment | null>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+
+  const openPaymentDialog = (payment: SalaryPayment) => {
+    setSelectedPayment(payment);
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handlePaymentProcessed = (paymentId: string, updates: Partial<SalaryPayment>) => {
+    onUpdatePayment(paymentId, updates);
   };
 
   const totalBaseSalary = payments.reduce((sum, p) => sum + (p.baseSalary || 0), 0);
@@ -53,6 +59,7 @@ export const SalaryPaymentTable: React.FC<SalaryPaymentTableProps> = ({
   const totalLeaves = payments.reduce((sum, p) => sum + (p.leaves || p.leaveDays || 0), 0);
 
   return (
+    <>
     <div className="rounded-md border">
       <Table>
         <TableHeader>
@@ -108,7 +115,7 @@ export const SalaryPaymentTable: React.FC<SalaryPaymentTableProps> = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => markAsPaid(payment)}
+                      onClick={() => openPaymentDialog(payment)}
                       className="text-green-600 hover:text-green-800"
                     >
                       <CheckCircle className="h-4 w-4" />
@@ -136,5 +143,13 @@ export const SalaryPaymentTable: React.FC<SalaryPaymentTableProps> = ({
         </TableBody>
       </Table>
     </div>
+
+    <SingleSalaryPaymentDialog
+      open={isPaymentDialogOpen}
+      onOpenChange={setIsPaymentDialogOpen}
+      payment={selectedPayment}
+      onProcess={handlePaymentProcessed}
+    />
+    </>
   );
 };

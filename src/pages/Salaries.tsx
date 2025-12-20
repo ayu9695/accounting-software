@@ -93,7 +93,7 @@ const Salaries: React.FC = () => {
         console.log('Salaries array:', salariesArray);
         console.log('Department map at fetch time:', departmentMap);
         console.log('Department map size:', departmentMap.size);
-        console.log('Raw department values:', salariesArray.map((p: any) => p.department));
+        console.log('Raw department values:', salariesArray.map((p: any) => p.employeeId.department));
         
         setTotalSum(data.sum || 0);
         setPaidSum(data.paidSum || 0);
@@ -101,12 +101,12 @@ const Salaries: React.FC = () => {
         // Transform salary payments to include department names
         const transformedData = Array.isArray(salariesArray) ? salariesArray.map((payment: any) => ({
           ...payment,
-          department: payment.department 
-            ? (departmentMap.get(payment.department) || payment.department)
-            : payment.department
+          department: payment.employeeId.department 
+            ? (departmentMap.get(payment.employeeId.department))
+            : payment.employeeId.department
         })) : [];
         
-        console.log('Transformed data with departments:', transformedData.map((p: any) => ({ name: p.employeeName, department: p.department })));
+        console.log('Transformed data with departments:', transformedData);
         
         setSalaryPayments(transformedData);
       } catch (err: any) {
@@ -325,9 +325,9 @@ const Salaries: React.FC = () => {
                   </div>
                 ) : salaryPayments.length > 0 ? (
                   <>
-                    {console.log('SalaryPayments data sent to table:', salaryPayments)}
+               {/*    {console.log('SalaryPayments data sent to table:', salaryPayments)}
                     {console.log('Department map:', departmentMap)}
-                    {console.log('Sample payment department field:', salaryPayments[0]?.department)}
+                     {console.log('Sample payment department field:', salaryPayments[0]?.department)} */} 
                     <SalaryPaymentTable 
                       payments={salaryPayments}
                       onUpdatePayment={handleUpdatePayment}
