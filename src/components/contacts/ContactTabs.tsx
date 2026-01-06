@@ -53,6 +53,18 @@ export const ContactTabs: React.FC<ContactTabsProps> = ({
     return company?.name || "Unknown Company";
   };
 
+  const handleMailClick = (email: string) => {
+    if (email) {
+      window.location.href = `mailto:${email}`;
+    }
+  };
+
+  const handleCallClick = (phone: string) => {
+    if (phone) {
+      window.location.href = `tel:${phone}`;
+    }
+  };
+
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
       <div className="flex items-center justify-between mb-6">
@@ -100,10 +112,22 @@ export const ContactTabs: React.FC<ContactTabsProps> = ({
                     <TableCell>{contact.phone}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Button size="icon" variant="ghost">
+                        <Button 
+                          size="icon" 
+                          variant="ghost"
+                          onClick={() => handleMailClick(contact.email)}
+                          disabled={!contact.email}
+                          title={contact.email ? `Send email to ${contact.email}` : 'No email available'}
+                        >
                           <Mail className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost">
+                        <Button 
+                          size="icon" 
+                          variant="ghost"
+                          onClick={() => handleCallClick(contact.phone)}
+                          disabled={!contact.phone}
+                          title={contact.phone ? `Call ${contact.phone}` : 'No phone available'}
+                        >
                           <Phone className="h-4 w-4" />
                         </Button>
                       </div>
@@ -146,8 +170,34 @@ export const ContactTabs: React.FC<ContactTabsProps> = ({
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground mb-3">
-                    <div>Email: {company.email}</div>
-                    <div>Phone: {company.phone}</div>
+                    <div className="flex items-center gap-2">
+                      <span>Email: {company.email}</span>
+                      {company.email && (
+                        <Button 
+                          size="icon" 
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={() => handleMailClick(company.email)}
+                          title={`Send email to ${company.email}`}
+                        >
+                          <Mail className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>Phone: {company.phone}</span>
+                      {company.phone && (
+                        <Button 
+                          size="icon" 
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={() => handleCallClick(company.phone)}
+                          title={`Call ${company.phone}`}
+                        >
+                          <Phone className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   
                   {getCompanyContacts(company.id).length > 0 && (
@@ -167,6 +217,26 @@ export const ContactTabs: React.FC<ContactTabsProps> = ({
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <span>{contact.email}</span>
                               <span>{contact.phone}</span>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => handleMailClick(contact.email)}
+                                disabled={!contact.email}
+                                title={contact.email ? `Send email to ${contact.email}` : 'No email'}
+                              >
+                                <Mail className="h-3 w-3" />
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => handleCallClick(contact.phone)}
+                                disabled={!contact.phone}
+                                title={contact.phone ? `Call ${contact.phone}` : 'No phone'}
+                              >
+                                <Phone className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
                         ))}
