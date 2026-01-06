@@ -60,10 +60,12 @@ export interface Invoice {
   customField?: string;
   notes?: string;
   paymentHistory: PaymentRecord[];
-  paymentMethod: string,
-  paidAmount: number,
-  paymenReference: string,
-  remainingAmount: number
+  paymentMethod?: string;
+  paymentMethodName?: string;
+  paymentDate?: string;
+  paidAmount?: number;
+  paymentReference?: string;
+  remainingAmount?: number;
 }
 
 export interface PaymentRecord {
@@ -217,8 +219,14 @@ export interface VendorBill {
   description?: string;
   fileName?: string;
   fileUrl?: string;
-  paymentDate?: Date;
+  attachments?: Array<{
+    _id: string;
+    name: string;
+    contentType?: string;
+  }>;
+  paymentDate?: string;
   paymentMethod?: string;
+  paymentMethodName?: string;
   paymentReference?: string;
   verifiedDate?: string;
   verifiedBy?: string;

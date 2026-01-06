@@ -19,6 +19,7 @@ import { toast } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { User, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/auth/AuthContext";
 
 // Create a context to share settings across the app
 export const SettingsContext = React.createContext<{
@@ -45,6 +46,8 @@ const availableCurrencies = [
 
 const Settings = () => {
   const { toast } = useToast();
+  const { user } = useAuth() as { user: { role?: string } | null };
+  const isSuperAdmin = user?.role === 'superadmin';
   
   const [companySettings, setCompanySettings] = useState({
     name: "CloudScribe Finance",
@@ -138,9 +141,16 @@ interface Department {
   description: string;
 }
 
+interface PaymentMethod {
+  id: string;
+  code: string;
+  name: string;
+}
+
   const [settings, setSettings] = useState<Settings | null>();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [newDepartment, setNewDepartment] = useState({ name: '', description: '' });
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -230,6 +240,28 @@ interface Department {
     // }
     };
     fetchDepartments();
+  }, []);
+
+  // Fetch payment methods
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const res = await fetch(`${baseUrl}/paymentMethods`, {
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const errortext = await res.text();
+          throw new Error(`Error ${res.status}: ${errortext}`);
+        }
+        const data: PaymentMethod[] = await res.json();
+        console.log("fetched payment methods: ", data);
+        setPaymentMethods(data);
+      } catch (err: any) {
+        console.error('Failed to fetch payment methods:', err);
+      }
+    };
+    fetchPaymentMethods();
   }, []);
 
   const handleAddDepartment = async () => {
@@ -337,6 +369,12 @@ const handleDeleteDepartment = async (deptId: string) => {
               className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accounting-blue pb-2 pt-2"
             >
               Departments
+            </TabsTrigger>
+            <TabsTrigger 
+              value="payment-methods"
+              className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accounting-blue pb-2 pt-2"
+            >
+              Payment Methods
             </TabsTrigger>
             {/* <TabsTrigger 
               value="security"
@@ -765,6 +803,42 @@ const handleDeleteDepartment = async (deptId: string) => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="payment-methods">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Methods</CardTitle>
+                <CardDescription>View available payment methods configured in the system.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="font-medium">Available Payment Methods</h3>
+                  <div className="border rounded-md p-4 space-y-4">
+                    {paymentMethods.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">No payment methods configured</p>
+                    ) : (
+                      paymentMethods.map((method) => (
+                        <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                              <p className="font-medium">{method.name}</p>
+                              <p className="text-sm text-gray-500">Code: {method.code}</p>
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            ID: {method.id}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Payment methods are managed through the backend. Contact your administrator to add or modify payment methods.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="security">
             <Card>
               <CardHeader>
@@ -809,7 +883,9 @@ const handleDeleteDepartment = async (deptId: string) => {
                   <p className="text-sm text-muted-foreground">These actions are irreversible.</p>
                   <div className="flex gap-4">
                     <Button variant="destructive">Delete Account</Button>
-                    <Button variant="outline">Export All Data</Button>
+                    {isSuperAdmin && (
+                      <Button variant="outline">Export All Data</Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

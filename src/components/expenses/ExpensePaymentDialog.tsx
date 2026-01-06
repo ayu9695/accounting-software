@@ -14,6 +14,7 @@ interface ExpensePaymentDialogProps {
   onPayment: (paymentData: {
     paymentDate: string;
     paymentMethod: string;
+    paymentMethodName: string;
     reference?: string;
     notes?: string;
   }) => void;
@@ -27,15 +28,6 @@ interface paymentMethods {
   name: string;
 };
 
-// const paymentMethods = [
-//   { value: "bank_transfer", label: "Bank Transfer" },
-//   { value: "credit_card", label: "Credit Card" },
-//   { value: "debit_card", label: "Debit Card" },
-//   { value: "cash", label: "Cash" },
-//   { value: "cheque", label: "Cheque" },
-//   { value: "upi", label: "UPI" },
-//   { value: "net_banking", label: "Net Banking" }
-// ];
 
 export const ExpensePaymentDialog: React.FC<ExpensePaymentDialogProps> = ({
   open,
@@ -46,7 +38,6 @@ export const ExpensePaymentDialog: React.FC<ExpensePaymentDialogProps> = ({
   expenseDescription
 }) => {
 const [paymentMethods, setPaymentMethods] = useState<paymentMethods[]>([]);
-  const [selectedMethod, setSelectedMethod] = useState("");
   const [formData, setFormData] = useState({
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: "",
@@ -84,9 +75,14 @@ const [paymentMethods, setPaymentMethods] = useState<paymentMethods[]>([]);
       return;
     }
 
+    // Find the selected payment method to get its name
+    const selectedPaymentMethod = paymentMethods.find(m => m.id === formData.paymentMethod);
+    const paymentMethodName = selectedPaymentMethod?.name || '';
+
     onPayment({
       paymentDate: formData.paymentDate,
-      paymentMethod: formData.paymentMethod,
+      paymentMethod: formData.paymentMethod,  // ID for BE
+      paymentMethodName: paymentMethodName,   // Name for display
       reference: formData.reference.trim() || undefined,
       notes: formData.notes.trim() || undefined
     });

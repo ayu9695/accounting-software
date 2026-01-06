@@ -27,6 +27,7 @@ interface SalaryPayment {
   year?: number;
   defaultWorkingDays?: number;
   paymentMethod?: string;
+  paymentMethodName?: string;
   paidOn?: string;
 }
 

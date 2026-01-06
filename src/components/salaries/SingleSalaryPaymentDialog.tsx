@@ -30,7 +30,14 @@ interface SalaryPayment {
   year?: number;
   defaultWorkingDays?: number;
   paymentMethod?: string;
+  paymentMethodName?: string;
   paidOn?: string;
+}
+
+interface PaymentMethod {
+  id: string;
+  code: string;
+  name: string;
 }
 
 interface PaymentEdits {
@@ -58,8 +65,25 @@ export const SingleSalaryPaymentDialog: React.FC<SingleSalaryPaymentDialogProps>
 }) => {
   const [edits, setEdits] = useState<PaymentEdits>({});
   const [processing, setProcessing] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   
   const baseUrl = import.meta.env.VITE_API_URL;
+
+  // Fetch payment methods from API
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/paymentMethods`, { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          setPaymentMethods(data);
+        }
+      } catch (error) {
+        console.error("Error fetching payment methods:", error);
+      }
+    };
+    fetchPaymentMethods();
+  }, [baseUrl]);
 
   // Format paidOn date from BE (ISO string) to YYYY-MM-DD for input field
   const formatPaidOnDate = (isoDateString?: string) => {
@@ -75,13 +99,14 @@ export const SingleSalaryPaymentDialog: React.FC<SingleSalaryPaymentDialogProps>
     if (!open) {
       setEdits({});
     } else if (payment) {
-      // Set default values when opening
+      // Set default values when opening - use existing paymentMethod ID or first from list
+      const defaultPaymentMethod = payment.paymentMethod || (paymentMethods.length > 0 ? paymentMethods[0].id : '');
       setEdits({
-        paymentMethod: payment.paymentMethod || 'bank_transfer',
+        paymentMethod: defaultPaymentMethod,
         paidOn: formatPaidOnDate(payment.paidOn || payment.paymentDate)
       });
     }
-  }, [open, payment]);
+  }, [open, payment, paymentMethods]);
 
   const updateEdit = (field: keyof PaymentEdits, value: number | string | undefined) => {
     setEdits(prev => ({
@@ -102,10 +127,15 @@ export const SingleSalaryPaymentDialog: React.FC<SingleSalaryPaymentDialogProps>
 
     setProcessing(true);
 
+    // Get the selected payment method name for display
+    const selectedMethod = paymentMethods.find(m => m.id === edits.paymentMethod);
+    const paymentMethodName = selectedMethod?.name || '';
+
     // Build payload
     const payload: any = {
       salaryId: paymentId,
-      paymentMethod: edits.paymentMethod || payment.paymentMethod || 'bank_transfer',
+      paymentMethod: edits.paymentMethod || payment.paymentMethod || '',
+      paymentMethodName: paymentMethodName,
       paidOn: edits.paidOn || formatPaidOnDate(payment.paidOn || payment.paymentDate)
     };
 
@@ -210,17 +240,18 @@ export const SingleSalaryPaymentDialog: React.FC<SingleSalaryPaymentDialogProps>
                 <div>
                   <Label className="text-xs text-gray-600">Payment Method</Label>
                   <Select 
-                    value={(getEditValue('paymentMethod', payment.paymentMethod || 'bank_transfer') as string)}
+                    value={(getEditValue('paymentMethod', payment.paymentMethod || '') as string)}
                     onValueChange={(value) => updateEdit('paymentMethod', value)}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select method" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="upi">UPI</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="cheque">Cheque</SelectItem>
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method.id} value={method.id}>
+                          {method.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -313,7 +344,7 @@ export const SingleSalaryPaymentDialog: React.FC<SingleSalaryPaymentDialogProps>
                   <p className="text-2xl font-bold text-green-900">₹{netSalaryValue.toLocaleString()}</p>
                 </div>
                 <div className="text-right text-sm text-green-700">
-                  <p>Payment Method: {(getEditValue('paymentMethod', 'bank_transfer') as string).replace('_', ' ').toUpperCase()}</p>
+                  <p>Payment Method: {paymentMethods.find(m => m.id === getEditValue('paymentMethod', ''))?.name || 'Not selected'}</p>
                   <p>Date: {getEditValue('paidOn', formatPaidOnDate(payment.paidOn || payment.paymentDate)) as string}</p>
                 </div>
               </div>

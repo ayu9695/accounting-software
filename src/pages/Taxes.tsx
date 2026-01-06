@@ -9,6 +9,7 @@ import { CalendarIcon, TrendingUp, TrendingDown, FileText, Download, AlertTriang
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/auth/AuthContext";
 import { toast } from "sonner";
 
 interface GST {
@@ -26,6 +27,11 @@ interface TDS {
   'paid' : Number;
   'payable' : Number;
 };
+
+interface TaxAmounts {
+  invoiceTaxAmount: number;
+  vendorTdsCredit: number;
+}
 
 interface Tax {
   'gst' : GST;
@@ -75,8 +81,12 @@ const getMonthOptions = () => {
 
 
 const Taxes = () => {
+  const { user } = useAuth() as { user: { role?: string } | null };
+  const isSuperAdmin = user?.role === 'superadmin';
+  
   const [loading, setLoading] = useState(true);
   const [taxes, setTaxes] = useState<Tax>();
+  const [taxAmounts, setTaxAmounts] = useState<TaxAmounts>({ invoiceTaxAmount: 0, vendorTdsCredit: 0 });
   const baseUrl = import.meta.env.VITE_API_URL;
   const monthOptions = getMonthOptions();
   const [selectedMonth, setSelectedMonth] = useState(monthOptions[0].value);
@@ -125,21 +135,65 @@ const Taxes = () => {
       } finally {
         setLoading(false);
      }
-  }, [baseUrl, toast]);
+  }, [baseUrl]);
+
+  // Fetch total tax amounts (GST output and TDS paid) from the dashboard API
+  const fetchTaxAmounts = useCallback(async (month: string) => {
+    if (!month) return;
+    try {
+      // Parse month from "MM-YYYY" format
+      const [monthNum, yearNum] = month.split('-').map(Number);
+      
+      // Calculate startDate (1st of the month) and endDate (last day of the month or today if current month)
+      const startDate = new Date(yearNum, monthNum - 1, 1);
+      const lastDayOfMonth = new Date(yearNum, monthNum, 0);
+      const today = new Date();
+      const endDate = lastDayOfMonth > today ? today : lastDayOfMonth;
+      
+      // Format dates as YYYY-MM-DD
+      const formatDate = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+      
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
+      
+      console.log('Fetching tax amounts for:', startDateStr, 'to', endDateStr);
+      
+      const response = await fetch(
+        `${baseUrl}/dashboard/total-tax-amount?startDate=${startDateStr}&endDate=${endDateStr}`,
+        { credentials: 'include' }
+      );
+      
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(`Server responded ${response.status}${errText ? `: ${errText}` : ''}`);
+      }
+      
+      const data = await response.json();
+      console.log('Tax amounts response:', data);
+      
+      setTaxAmounts({
+        invoiceTaxAmount: Number(data.invoiceTaxAmount) || 0,
+        vendorTdsCredit: Number(data.vendorTdsCredit) || 0
+      });
+    } catch (error) {
+      console.error("Error fetching tax amounts:", error);
+    }
+  }, [baseUrl]);
 
   useEffect(() => {
     console.log("selectedMonth : ", selectedMonth);
-        // Call the fetch function immediately upon component mount
+        // Call the fetch functions immediately upon component mount
         fetchTaxes(selectedMonth);
+        fetchTaxAmounts(selectedMonth);
 
-        // The dependency array [fetchTaxes, selectedMonth] ensures that 
+        // The dependency array ensures that 
         // the effect runs only on mount AND whenever selectedMonth changes.
-    }, [fetchTaxes, selectedMonth]);
-
-    useEffect(() => {
-    if (!selectedMonth) return;
-    fetchTaxes(selectedMonth);
-  }, [selectedMonth, fetchTaxes]);
+    }, [fetchTaxes, fetchTaxAmounts, selectedMonth]);
 
    if (loading || !taxes) {
     return (
@@ -182,10 +236,12 @@ const Taxes = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export Report
-            </Button>
+            {isSuperAdmin && (
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
+            )}
           </div>
         </div>
 
@@ -202,7 +258,7 @@ const Taxes = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Output Tax</span>
-                  <span className="font-medium">₹{taxes.gst.output.toLocaleString()}</span>
+                  <span className="font-medium">₹{taxAmounts.invoiceTaxAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Input Tax Credit</span>
@@ -211,7 +267,7 @@ const Taxes = () => {
                 <div className="border-t pt-2">
                   <div className="flex justify-between font-semibold">
                     <span>Net GST Payable</span>
-                    <span className="text-blue-600">₹{taxes.gst.payable.toLocaleString()}</span>
+                    <span className="text-blue-600">₹{(taxAmounts.invoiceTaxAmount - Number(taxes.gst.input)).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -233,12 +289,12 @@ const Taxes = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">TDS Paid</span>
-                  <span className="font-medium">₹0</span>
+                  <span className="font-medium">₹{taxAmounts.vendorTdsCredit.toLocaleString()}</span>
                 </div>
                 <div className="border-t pt-2">
                   <div className="flex justify-between font-semibold">
                     <span>Net TDS Payable</span>
-                    <span className="text-amber-600">₹0</span>
+                    <span className="text-amber-600">₹{taxAmounts.vendorTdsCredit.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -287,11 +343,11 @@ const Taxes = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">GST Payable</span>
-                  <span className="font-medium">₹{taxes.gst.payable.toLocaleString()}</span>
+                  <span className="font-medium">₹{(taxAmounts.invoiceTaxAmount - Number(taxes.gst.input)).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">TDS Payable</span>
-                  <span className="font-medium">₹0</span>
+                  <span className="font-medium">₹{taxAmounts.vendorTdsCredit.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Penalties</span>
@@ -300,7 +356,7 @@ const Taxes = () => {
                 <div className="border-t pt-2">
                   <div className="flex justify-between font-semibold">
                     <span>Total Liability</span>
-                    <span className="text-green-600 text-lg">₹{totalLiability.toLocaleString()}</span>
+                    <span className="text-green-600 text-lg">₹{(taxAmounts.invoiceTaxAmount - Number(taxes.gst.input) + taxAmounts.vendorTdsCredit).toLocaleString()}</span>
                   </div>
                 </div>
               </div>

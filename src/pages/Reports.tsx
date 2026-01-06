@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/auth/AuthContext";
 
 // Enhanced mock financial data with more detailed breakdown
 const generateDetailedFinancialData = (month: number, year: number) => {
@@ -121,6 +122,9 @@ const getPeriodOptions = () => {
 };
 
 const Reports = () => {
+  const { user } = useAuth() as { user: { role?: string } | null };
+  const isSuperAdmin = user?.role === 'superadmin';
+  
   const periodOptions = getPeriodOptions();
   const [selectedPeriod, setSelectedPeriod] = useState(periodOptions[0].value);
   
@@ -165,10 +169,12 @@ const Reports = () => {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export PDF
-          </Button>
+          {isSuperAdmin && (
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Export PDF
+            </Button>
+          )}
         </div>
       </div>
 
