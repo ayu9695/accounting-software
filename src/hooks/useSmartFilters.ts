@@ -63,7 +63,7 @@ export const useSmartFilters = <T extends Record<string, any>>(
     if (filters.dateRange?.from || filters.dateRange?.to) {
       result = result.filter(item => {
         // Try common date fields
-        const dateFields = ['date', 'issueDate', 'dueDate', 'createdAt', 'updatedAt'];
+        const dateFields = ['date', 'issueDate', 'dueDate', 'billDate', 'uploadDate', 'expenseDate', 'createdAt', 'updatedAt'];
         const dateFieldName = dateFields.find(field => item[field as keyof T]);
         
         if (dateFieldName) {

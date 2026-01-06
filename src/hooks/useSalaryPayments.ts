@@ -24,6 +24,7 @@ export const useSalaryPayments = () => {
   const recordSalaryPayment = (recordId: string, paymentData: {
     paymentDate: string;
     paymentMethod: string;
+    paymentMethodName?: string;
     paymentReference?: string;
   }) => {
     setSalaryRecords(prev => prev.map(record => 
@@ -33,6 +34,7 @@ export const useSalaryPayments = () => {
             status: 'paid' as const,
             paymentDate: paymentData.paymentDate,
             paymentMethod: paymentData.paymentMethod,
+            paymentMethodName: paymentData.paymentMethodName,
             paymentReference: paymentData.paymentReference
           }
         : record

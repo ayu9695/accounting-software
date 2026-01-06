@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PageLayout from "@/components/PageLayout";
 import {
   Card,
@@ -54,6 +54,7 @@ import {
   Edit,
   Trash2,
   RefreshCw,
+  Upload,
 } from "lucide-react";
 import { formatDate, formatCurrency } from "@/utils/calculations";
 import { toast } from "@/components/ui/use-toast";
@@ -71,6 +72,8 @@ const VendorBills: React.FC = () => {
     createVendorBill,
     updateVendorBill,
     updateVendorPayment,
+    uploadVendorBillPdf,
+    downloadVendorBillPdf,
     deleteVendorBill,
     getVendorBillById,
     refreshData,
@@ -95,15 +98,53 @@ const VendorBills: React.FC = () => {
     amount: 0,
   });
   const [openEditAfterSelect, setOpenEditAfterSelect] = useState(false);
+  const [uploadBillId, setUploadBillId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const handleUploadClick = (billId: string) => {
+    setUploadBillId(billId);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && uploadBillId) {
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a PDF file.",
+          variant: "destructive",
+        });
+        return;
+      }
+      try {
+        await uploadVendorBillPdf(uploadBillId, file);
+        toast({
+          title: "Upload Successful",
+          description: "PDF has been uploaded successfully.",
+        });
+      } catch (error) {
+        toast({
+          title: "Upload Failed",
+          description: "Failed to upload PDF. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setUploadBillId(null);
+  };
 
   const handlePayment = async (paymentData: any) => {
     try {
-      console.log("paid maount is : ", paymentData);
       await updateVendorPayment(paymentDialog.billId, {
         paymentStatus: "paid",
-        // paymentDate: paymentData.paymentDate,
+        paymentDate: paymentData.paymentDate,
         paymentMethod: paymentData.paymentMethod,
+        paymentMethodName: paymentData.paymentMethodName,
         paidAmount: paymentData.amount,
         paymentReference: paymentData.reference,
       });
@@ -121,7 +162,6 @@ const VendorBills: React.FC = () => {
       });
     }
   };
-  console.log("Loaded vendor bill info: ", vendorBills);
 
   const handleVerify = async (billId: string, billNumber: string) => {
     try {
@@ -146,7 +186,6 @@ const VendorBills: React.FC = () => {
 
   const handleViewBill = async (billId: string) => {
     try {
-      console.log("bill id is: ", billId);
       const bill = await getVendorBillById(billId);
       setSelectedBill(bill);
       setIsViewBillOpen(true);
@@ -244,6 +283,15 @@ const VendorBills: React.FC = () => {
   return (
     <PageLayout title="Vendor Bills">
       <div className="space-y-6">
+        {/* Hidden file input for PDF upload */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".pdf,application/pdf"
+          className="hidden"
+        />
+        
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-blue-50 border-blue-200">
             <CardHeader>
@@ -290,7 +338,7 @@ const VendorBills: React.FC = () => {
           <div className="flex justify-between items-center">
             <TabsList>
               <TabsTrigger value="bills">Bills</TabsTrigger>
-              <TabsTrigger value="upload">Upload</TabsTrigger>
+              {/* <TabsTrigger value="upload">Upload</TabsTrigger> */}
             </TabsList>
 
             <div className="flex gap-2">
@@ -340,8 +388,7 @@ const VendorBills: React.FC = () => {
                         <TableHead className="text-right">Payable</TableHead>
                         <TableHead className="text-right">TDS</TableHead>
                         <TableHead className="text-right">Pending</TableHead>
-                        <TableHead>Paid On</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Paid On / Status</TableHead>
                         <TableHead className="w-32">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -358,11 +405,17 @@ const VendorBills: React.FC = () => {
                           <TableCell className="text-right">₹ {bill.payableAmount.toLocaleString()}</TableCell>
                           <TableCell className="text-right">₹ {bill.tdsAmount} ({bill.tdsRate}%)</TableCell>
                           <TableCell className="text-right">₹ {bill.pendingAmount}</TableCell>
-                          <TableCell>{bill.paymentDate ? formatDate(bill.paymentDate) : '-'}</TableCell>
                           <TableCell>
-                            <Badge className={getStatusBadge(bill.paymentStatus)}>
-                              {bill.paymentStatus}
-                            </Badge>
+                            <div className="flex flex-col gap-1">
+                              {bill.paymentDate ? (
+                                <span className="text-sm">{formatDate(bill.paymentDate)}</span>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">-</span>
+                              )}
+                              <Badge className={getStatusBadge(bill.paymentStatus)}>
+                                {bill.paymentStatus}
+                              </Badge>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
@@ -374,20 +427,38 @@ const VendorBills: React.FC = () => {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleEditBill(bill._id)}
-                                title="Edit Bill"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              {bill.paymentStatus !== 'paid' && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleEditBill(bill._id)}
+                                  title="Edit Bill"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {bill.attachments && bill.attachments.length > 0 && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => downloadVendorBillPdf(
+                                    bill._id, 
+                                    bill.attachments![0]._id, 
+                                    bill.attachments![0].name
+                                  )}
+                                  title="Download PDF"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                title="Download"
+                                onClick={() => handleUploadClick(bill._id)}
+                                title="Upload PDF"
+                                className="text-blue-600 hover:text-blue-800"
                               >
-                                <Download className="h-4 w-4" />
+                                <Upload className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
@@ -413,7 +484,7 @@ const VendorBills: React.FC = () => {
                                   <CheckCircle className="h-4 w-4" />
                                 </Button>
                               )} */}
-                              {/* {bill.status === 'verified' && ( */}
+                              {bill.paymentStatus !== 'paid' && (
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
@@ -428,14 +499,14 @@ const VendorBills: React.FC = () => {
                                 >
                                   <CreditCard className="h-4 w-4" />
                                 </Button>
-                              {/* )} */}
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
                       {vendorBills.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center py-8">
+                          <TableCell colSpan={9} className="text-center py-8">
                             <div className="text-muted-foreground">
                               No vendor bills found. Create your first bill to get started.
                             </div>
@@ -449,7 +520,7 @@ const VendorBills: React.FC = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="upload">
+          {/* <TabsContent value="upload">
             <Card>
               <CardHeader>
                 <CardTitle>Upload Vendor Bills</CardTitle>
@@ -460,7 +531,7 @@ const VendorBills: React.FC = () => {
                 </p>
               </CardContent>
             </Card>
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
 
         {/* Add Bill Dialog */}
@@ -536,10 +607,19 @@ const VendorBills: React.FC = () => {
                     <label className="text-sm font-medium">Attachments</label>
                     <div className="mt-2 space-y-2">
                       {selectedBill.attachments.map((attachment, index) => (
-                        <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                        <div key={attachment._id || index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                           <FileText className="h-4 w-4" />
                           <span className="text-sm">{attachment.name}</span>
-                          <Button variant="ghost" size="sm" className="ml-auto">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="ml-auto"
+                            onClick={() => downloadVendorBillPdf(
+                              selectedBill._id, 
+                              attachment._id, 
+                              attachment.name
+                            )}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>

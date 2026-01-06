@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
+interface PaymentMethod {
+  id: string;
+  _id?: string;
+  code: string;
+  name: string;
+}
+
 interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -15,6 +22,7 @@ interface PaymentDialogProps {
     amount: number;
     paymentDate: string;
     paymentMethod: string;
+    paymentMethodName: string;
     reference?: string;
     notes?: string;
   }) => void;
@@ -29,13 +37,38 @@ export const PaymentDialog: React.FC<PaymentDialogProps> = ({
   totalAmount,
   title
 }) => {
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [formData, setFormData] = useState({
     amount: totalAmount.toString(),
     paymentDate: new Date().toISOString().split('T')[0],
-    paymentMethod: "bank_transfer",
+    paymentMethod: "",
     reference: "",
     notes: ""
   });
+
+  const baseUrl = import.meta.env.VITE_API_URL;
+
+  // Fetch payment methods from API
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/paymentMethods`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        setPaymentMethods(data);
+      } catch (error) {
+        console.error("Error fetching paymentMethods:", error);
+        toast.error("Failed to load Payment Methods");
+      }
+    };
+    fetchPaymentMethods();
+  }, []);
+
+  // Update amount when totalAmount changes
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, amount: totalAmount.toString() }));
+  }, [totalAmount]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,10 +78,20 @@ export const PaymentDialog: React.FC<PaymentDialogProps> = ({
       return;
     }
 
+    if (!formData.paymentMethod) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    // Find the selected payment method to get its name
+    const selectedPaymentMethod = paymentMethods.find(m => (m.id || m._id) === formData.paymentMethod);
+    const paymentMethodName = selectedPaymentMethod?.name || '';
+
     onPayment({
       amount: parseFloat(formData.amount),
       paymentDate: formData.paymentDate,
-      paymentMethod: formData.paymentMethod,
+      paymentMethod: formData.paymentMethod,      // ID for BE
+      paymentMethodName: paymentMethodName,        // Name for display
       reference: formData.reference,
       notes: formData.notes
     });
@@ -57,7 +100,7 @@ export const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setFormData({
       amount: totalAmount.toString(),
       paymentDate: new Date().toISOString().split('T')[0],
-      paymentMethod: "bank_transfer",
+      paymentMethod: "",
       reference: "",
       notes: ""
     });
@@ -96,21 +139,20 @@ export const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </div>
 
           <div>
-            <Label htmlFor="paymentMethod">Payment Method</Label>
+            <Label htmlFor="paymentMethod">Payment Method *</Label>
             <Select 
               value={formData.paymentMethod} 
               onValueChange={(value) => setFormData({ ...formData, paymentMethod: value })}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select method" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                <SelectItem value="cheque">Cheque</SelectItem>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="upi">UPI</SelectItem>
-                <SelectItem value="credit_card">Credit Card</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+              <SelectContent className="bg-white">
+                {paymentMethods.map((method) => (
+                  <SelectItem key={method.id || method._id} value={method.id || method._id || ''}>
+                    {method.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

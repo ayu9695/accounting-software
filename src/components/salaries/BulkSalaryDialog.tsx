@@ -30,6 +30,13 @@ interface SalaryRecord {
   year: number;
   paidOn?: string;
   paymentMethod?: string;
+  paymentMethodName?: string;
+}
+
+interface PaymentMethod {
+  id: string;
+  code: string;
+  name: string;
 }
 
 interface EmployeeEdits {
@@ -62,8 +69,25 @@ export const BulkSalaryDialog: React.FC<BulkSalaryDialogProps> = ({
   const [selectedSalaries, setSelectedSalaries] = useState<string[]>([]);
   const [employeeEdits, setEmployeeEdits] = useState<Record<string, EmployeeEdits>>({});
   const [processing, setProcessing] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   
   const baseUrl = import.meta.env.VITE_API_URL;
+
+  // Fetch payment methods from API
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/paymentMethods`, { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          setPaymentMethods(data);
+        }
+      } catch (error) {
+        console.error("Error fetching payment methods:", error);
+      }
+    };
+    fetchPaymentMethods();
+  }, [baseUrl]);
 
   // Format paidOn date from BE (ISO string) to YYYY-MM-DD for input field
   const formatPaidOnDate = (isoDateString?: string) => {
@@ -127,10 +151,17 @@ export const BulkSalaryDialog: React.FC<BulkSalaryDialogProps> = ({
     const salariesPayload = selectedSalaries.map(salaryId => {
       const salary = pendingSalaries.find(s => s._id === salaryId);
       const edits = employeeEdits[salaryId] || {};
+      
+      // Get the payment method ID and name
+      const paymentMethodId = edits.paymentMethod || salary?.paymentMethod || (paymentMethods.length > 0 ? paymentMethods[0].id : '');
+      const selectedMethod = paymentMethods.find(m => m.id === paymentMethodId);
+      const paymentMethodName = selectedMethod?.name || '';
+      
       const payload: any = {
         salaryId,
-        // Always send paymentMethod and paidOn (use BE value or default if not edited)
-        paymentMethod: edits.paymentMethod || salary?.paymentMethod || 'bank_transfer',
+        // Always send paymentMethod (ID) and paymentMethodName
+        paymentMethod: paymentMethodId,
+        paymentMethodName: paymentMethodName,
         paidOn: edits.paidOn || formatPaidOnDate(salary?.paidOn)
       };
 
@@ -271,17 +302,18 @@ export const BulkSalaryDialog: React.FC<BulkSalaryDialogProps> = ({
                               <div>
                                 <Label className="text-xs text-gray-600">Payment Method</Label>
                                 <Select 
-                                  value={(getEditValue(salary._id, 'paymentMethod', salary.paymentMethod || 'bank_transfer') as string)}
+                                  value={(getEditValue(salary._id, 'paymentMethod', salary.paymentMethod || (paymentMethods.length > 0 ? paymentMethods[0].id : '')) as string)}
                                   onValueChange={(value) => updateEmployeeEdit(salary._id, 'paymentMethod', value)}
                                 >
                                   <SelectTrigger className="mt-1">
                                     <SelectValue placeholder="Select method" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                                    <SelectItem value="upi">UPI</SelectItem>
-                                    <SelectItem value="cash">Cash</SelectItem>
-                                    <SelectItem value="cheque">Cheque</SelectItem>
+                                    {paymentMethods.map((method) => (
+                                      <SelectItem key={method.id} value={method.id}>
+                                        {method.name}
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               </div>

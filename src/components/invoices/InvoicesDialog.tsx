@@ -45,7 +45,10 @@ export interface Invoice {
   invoiceNumber: string;
   clientId: string;
   clientName: string;
-  department: string;
+  department?: {
+    _id: string;
+    name: string;
+  };
   issueDate: string;
   dueDate: string;
   hsnCode?: string;
@@ -142,11 +145,6 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
     } catch (err) {
       console.error('Failed to fetch departments:', err);
     }
-  };
-
-  const getDepartmentName = (departmentId: string) => {
-    const dept = departments.find(d => d._id === departmentId);
-    return dept ? dept.name : 'Unknown Department';
   };
 
   const getStatusColor = (status: string) => {
@@ -272,10 +270,6 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
                     <p>{invoice.hsnCode}</p>
                   </div>
                 )}
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Department</Label>
-                  <p>{getDepartmentName(invoice.department)}</p>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -320,7 +314,7 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
               <CardTitle className="text-lg text-blue-700">Client Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Client Name</Label>
                   <p className="font-semibold">{invoice.clientName}</p>
@@ -472,34 +466,6 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
               </CardContent>
             </Card>
           )}
-
-          {/* Payment History */}
-          {/* {invoice.paymentHistory && invoice.paymentHistory.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg text-blue-700">Payment History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {invoice.paymentHistory.map((payment, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <div>
-                        <div className="font-medium">₹{payment.amount.toFixed(2)}</div>
-                        <div className="text-sm text-gray-600">
-                          {new Date(payment.paymentDate).toLocaleDateString()}
-                          {payment.paymentMethod && ` • ${payment.paymentMethod}`}
-                          {payment.reference && ` • Ref: ${payment.reference}`}
-                        </div>
-                        {payment.notes && (
-                          <div className="text-sm text-gray-500">{payment.notes}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )} */}
         </div>
       </DialogContent>
     </Dialog>
@@ -746,7 +712,7 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
     setFormData({
       clientName: invoice.clientName,
       clientId: invoice.clientId,
-      department: invoice.department,
+      department: invoice.department?._id,
       invoiceNumber: invoice.invoiceNumber,
       issueDate: invoice.issueDate ? invoice.issueDate.split('T')[0] : '',
       dueDate: invoice.dueDate ? invoice.dueDate.split('T')[0] : '',
@@ -1002,21 +968,6 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                     </SelectContent>
                   </Select>
                 </div> */}
-                <div>
-                  <Label htmlFor="department">Department</Label>
-                  <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept._id} value={dept._id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div>
                   <Label htmlFor="hsnCode">HSN Code</Label>
                   <Input

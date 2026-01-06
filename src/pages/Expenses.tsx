@@ -9,6 +9,7 @@ import { PlusCircle, Receipt, Download } from "lucide-react";
 import { ExpensePaymentDialog } from "@/components/expenses/ExpensePaymentDialog";
 import { AddExpenseDialog } from "@/components/expenses/AddExpenseDialog";
 import { SmartFilters } from "@/components/common/SmartFilters";
+import { useAuth } from "@/auth/AuthContext";
 import { toast } from "sonner";
 
 interface Expense {
@@ -16,13 +17,12 @@ interface Expense {
   description: string;
   amount: number;
   category: string;
-  date: Date;
-  // vendor: string;
-  status: 'pending' | 'paid';
   approvalStatus: true | false;
   paymentStatus: true | false;
   paymentDate?: string;
+  expenseDate: Date;
   paymentMethod?: string;
+  paymentMethodName?: string;
   paymentReference?: string;
   notes?: string;
 }
@@ -33,60 +33,10 @@ interface paymentMethods {
   name: string;
 };
 
-const initialExpenses: Expense[] = [
-  // {
-  //   id: "1",
-  //   description: "Office Rent - January 2024",
-  //   amount: 50000,
-  //   category: "Rent",
-  //   date: 2024-01-01,
-  //   status: "paid",
-  //   paymentStatus : "true",
-  //   approvalStatus : "true",
-  //   paymentDate: "2024-01-01",
-  //   paymentMethod: "bank_transfer",
-  //   paymentReference: "TXN123456"
-  // },
-  // {
-  //   id: "2",
-  //   description: "Software Licenses",
-  //   amount: 25000,
-  //   approvalStatus : "true",
-  //   category: "Software",
-  //   date: "2024-01-05",
-  //   status: "pending",
-  //   paymentStatus : "false",
-  // }
-  // {
-  //   _id: "3",
-  //   description: "Office Supplies",
-  //   amount: 8500,
-  //   category: "Supplies",
-  //   date: "2024-01-08",
-  //   status: "pending"
-  // },
-  // {
-  //   _id: "4",
-  //   description: "Internet & Phone Bills",
-  //   amount: 12000,
-  //   category: "Utilities",
-  //   date: "2024-01-10",
-  //   status: "paid",
-  //   paymentDate: "2024-01-10",
-  //   paymentMethod: "credit_card",
-  //   paymentReference: "CC789012"
-  // },
-  // {
-  //   _id: "5",
-  //   description: "Marketing Campaign",
-  //   amount: 75000,
-  //   category: "Marketing",
-  //   date: "2024-01-15",
-  //   status: "pending"
-  // }
-];
-
 const Expenses: React.FC = () => {
+  const { user } = useAuth() as { user: { role?: string } | null };
+  const isSuperAdmin = user?.role === 'superadmin';
+  
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [addExpenseDialogOpen, setAddExpenseDialogOpen] = useState(false);
@@ -97,7 +47,6 @@ const Expenses: React.FC = () => {
   const [searchValue, setSearchValue] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [paymentMethods, setPaymentMethods] = useState<[]>([]);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -116,17 +65,16 @@ const Expenses: React.FC = () => {
           description: item.description,
           amount: item.amount,
           category: item.category,
-          date: item.date,
-          status: item.status ?? false,  // 👈 if data.status is undefined → becomes null
+          expenseDate: item.expenseDate,
           paymentDate: item.paymentDate,
           paymentStatus: item.paymentStatus ?? false,
           approvalStatus: item.approvalStatus ?? false,
           paymentMethod: item.paymentMethod,
+          paymentMethodName: item.paymentMethodName,
           paymentReference: item.paymentReference,
           notes: item.notes,
         }));
         setExpenses(newexpense);
-        console.log("expenses received : ", data, " expense set : ", expenses);
       } catch (error) {
         console.error("Error fetching invoices:", error);
         toast.error("Failed to load invoices");
@@ -137,29 +85,10 @@ const Expenses: React.FC = () => {
     fetchExpenses();
   }, []);
 
-  useEffect(()=> {
-    const fetchPaymentMethods = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${baseUrl}/paymentMethods`, {
-          credentials: 'include'
-        });
-        const data = await response.json();
-        setPaymentMethods(data);
-      } catch(error){
-        console.error("Error fetching paymentMethods:", error);
-        toast.error("Failed to load Payment Methods");
-      } finally{
-        setLoading(false);
-      }
-    };
-    fetchPaymentMethods();
-  }, []);
-
-  // Filter options
+  // Filter options - use paymentStatus (boolean) for filtering
   const statusOptions = [
-    { value: "paid", label: "Paid", count: expenses.filter(e => e.status === 'paid').length },
-    { value: "pending", label: "Pending", count: expenses.filter(e => e.status === 'pending').length }
+    { value: "paid", label: "Paid", count: expenses.filter(e => e.paymentStatus === true).length },
+    { value: "pending", label: "Pending", count: expenses.filter(e => e.paymentStatus === false).length }
   ];
 
   const categoryOptions = [
@@ -190,9 +119,13 @@ const Expenses: React.FC = () => {
       );
     }
 
-    // Status filter
+    // Status filter - use paymentStatus boolean
     if (selectedStatus && selectedStatus !== 'all') {
-      result = result.filter(expense => expense.status === selectedStatus);
+      if (selectedStatus === 'paid') {
+        result = result.filter(expense => expense.paymentStatus === true);
+      } else if (selectedStatus === 'pending') {
+        result = result.filter(expense => expense.paymentStatus === false);
+      }
     }
 
     // Category filter
@@ -200,30 +133,31 @@ const Expenses: React.FC = () => {
       result = result.filter(expense => expense.category.toLowerCase() === selectedCategory);
     }
 
-    // Date range filter
+    // Date range filter - use expenseDate
     if (dateRange.from || dateRange.to) {
       result = result.filter(expense => {
-        const expenseDate = new Date(expense.date);
-        if (dateRange.from && expenseDate < dateRange.from) return false;
-        if (dateRange.to && expenseDate > dateRange.to) return false;
+        const expDate = new Date(expense.expenseDate);
+        if (dateRange.from && expDate < dateRange.from) return false;
+        if (dateRange.to && expDate > dateRange.to) return false;
         return true;
       });
     }
 
     // Sorting
     result.sort((a, b) => {
-      let aValue: any = a[sortBy as keyof Expense];
-      let bValue: any = b[sortBy as keyof Expense];
+      let aValue: any;
+      let bValue: any;
 
       if (sortBy === 'date') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
+        // Use expenseDate for date sorting
+        aValue = new Date(a.expenseDate);
+        bValue = new Date(b.expenseDate);
       } else if (sortBy === 'amount') {
-        aValue = Number(aValue);
-        bValue = Number(bValue);
+        aValue = Number(a.amount);
+        bValue = Number(b.amount);
       } else {
-        aValue = String(aValue).toLowerCase();
-        bValue = String(bValue).toLowerCase();
+        aValue = String(a[sortBy as keyof Expense] || '').toLowerCase();
+        bValue = String(b[sortBy as keyof Expense] || '').toLowerCase();
       }
 
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
@@ -261,13 +195,14 @@ const Expenses: React.FC = () => {
   const handlePaymentSubmit = async(paymentData: {
     paymentDate: string;
     paymentMethod: string;
+    paymentMethodName: string;
     reference?: string;
     notes?: string;
   }) => {
     if (!selectedExpense) return;
       const payload = {
         paymentDate: paymentData.paymentDate,          // ISO string e.g. "2025-11-14"
-        paymentMethod: paymentData.paymentMethod,      // should be the code or id string
+        paymentMethod: paymentData.paymentMethod,      // ID for BE
         paymentReference: paymentData.reference,
         paymentNotes: paymentData.notes,
         paymentStatus: true
@@ -286,22 +221,24 @@ const Expenses: React.FC = () => {
 
         const updatedExpensePayment = await response.json();
         if (!response.ok) {
-          const errorData = await response.json();
           toast.error("Failed to record payment");
-    }
+          return;
+        }
 
     } catch (error){
         console.error("Error update payment:", error);
         toast.error("Failed to record payment");
+        return;
     }
 
     setExpenses(prev => prev.map(expense => 
       expense.id === selectedExpense.id 
         ? { 
             ...expense, 
-            status: 'paid' as const,
+            paymentStatus: true,
             paymentDate: paymentData.paymentDate,
             paymentMethod: paymentData.paymentMethod,
+            paymentMethodName: paymentData.paymentMethodName,
             paymentReference: paymentData.reference,
             notes: paymentData.notes
           }
@@ -325,9 +262,7 @@ const Expenses: React.FC = () => {
     // };
 
     // setExpenses(prev => [newExpense, ...prev]);
-    // toast.success("Expense added successfully");
     try{
-      console.log("Adding expense:", expenseData);
       const response = await fetch(`${baseUrl}/expenses`, {
           credentials: 'include',
           method: 'POST',
@@ -339,15 +274,31 @@ const Expenses: React.FC = () => {
 
         const data = await response.json();
         if (!response.ok) {
-          const errorData = await response.json();
-          toast.error("Failed to record payment");
+          toast.error("Failed to add expense");
+          return;
         }
-      setExpenses(data);
+      
+      // Add the new expense to the existing array
+      const newExpense: Expense = {
+        id: data.id || data._id,
+        description: data.description,
+        amount: data.amount,
+        category: data.category,
+        expenseDate: data.expenseDate || data.date,
+        paymentStatus: data.paymentStatus ?? false,
+        approvalStatus: data.approvalStatus ?? false,
+        paymentDate: data.paymentDate,
+        paymentMethod: data.paymentMethod,
+        paymentMethodName: data.paymentMethodName,
+        paymentReference: data.paymentReference,
+        notes: data.notes,
+      };
+      setExpenses(prev => [newExpense, ...prev]);
       toast.success("Expense added successfully");
 
     } catch (error){
-        console.error("Error update payment:", error);
-        toast.error("Failed to record payment");
+        console.error("Error adding expense:", error);
+        toast.error("Failed to add expense");
     }
   };
 
@@ -357,11 +308,11 @@ const Expenses: React.FC = () => {
       ...filteredExpenses.map(expense => [
         expense.description,
         expense.category,
-        expense.date,
+        expense.expenseDate ? new Date(expense.expenseDate).toLocaleDateString() : '',
         expense.amount,
-        expense.status,
-        expense.paymentDate || '',
-        expense.paymentMethod || ''
+        expense.paymentStatus ? 'Paid' : 'Pending',
+        expense.paymentDate ? new Date(expense.paymentDate).toLocaleDateString() : '',
+        expense.paymentMethodName || expense.paymentMethod || ''
       ].join(','))
     ].join('\n');
 
@@ -376,8 +327,8 @@ const Expenses: React.FC = () => {
   };
 
   const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const paidExpenses = filteredExpenses.filter(e => e.status === 'paid').reduce((sum, expense) => sum + expense.amount, 0);
-  const pendingExpenses = filteredExpenses.filter(e => e.status === 'pending').reduce((sum, expense) => sum + expense.amount, 0);
+  const paidExpenses = filteredExpenses.filter(e => e.paymentStatus === true).reduce((sum, expense) => sum + expense.amount, 0);
+  const pendingExpenses = filteredExpenses.filter(e => e.paymentStatus === false).reduce((sum, expense) => sum + expense.amount, 0);
 
   return (
     <PageLayout title="Expenses">
@@ -388,10 +339,12 @@ const Expenses: React.FC = () => {
             <p className="text-gray-600">Manage and track all your business expenses</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
+            {isSuperAdmin && (
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+            )}
             <Button onClick={() => setAddExpenseDialogOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Expense
@@ -483,7 +436,7 @@ const Expenses: React.FC = () => {
                   <TableRow key={expense.id}>
                     <TableCell className="font-medium">{expense.description}</TableCell>
                     <TableCell>{expense.category}</TableCell>
-                    <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(expense.expenseDate).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right font-medium">₹{expense.amount.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge 
@@ -504,8 +457,10 @@ const Expenses: React.FC = () => {
                     <TableCell>
                       {expense.paymentStatus === true ? (
                         <div className="text-sm">
-                          <div>{expense.paymentMethod?.replace('_', ' ').toUpperCase()}</div>
-                          <div className="text-gray-500">{expense.paymentDate}</div>
+                          <div>{expense.paymentMethodName || expense.paymentMethod}</div>
+                          <div className="text-gray-500">
+                            {expense.paymentDate ? new Date(expense.paymentDate).toLocaleDateString() : ''}
+                          </div>
                           {expense.paymentReference && (
                             <div className="text-gray-500 text-xs">{expense.paymentReference}</div>
                           )}

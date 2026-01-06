@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useInvoices } from "@/hooks/useInvoices";
 import { PaymentDialog } from "@/components/common/PaymentDialog";
+import { useAuth } from "@/auth/AuthContext";
 
 import { toast } from "@/components/ui/use-toast";
 
@@ -64,8 +65,18 @@ interface FilterState {
   status: 'all' | 'paid' | 'unpaid' | 'partial' | 'overdue';
 }
 
+interface Department {
+  _id: string;
+  tenantId: string;
+  name: string;
+  description: string;
+}
+
 const Invoices: React.FC = () => {
   const { updateInvoicePayment } = useInvoices();
+  const { user } = useAuth() as { user: { role?: string } | null };
+  const isSuperAdmin = user?.role === 'superadmin';
+  
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -73,6 +84,7 @@ const Invoices: React.FC = () => {
 
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
@@ -113,6 +125,31 @@ const Invoices: React.FC = () => {
       }
     };
     fetchInvoices();
+  }, []);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try{
+      const res = await fetch(`${baseUrl}/departments`, {
+        credentials: 'include'
+      });
+
+      if(!res.ok) {
+        const errortext = await res.text();
+        throw new Error(`Error ${res.status}: ${errortext}`);
+      }
+      const data: Department[] = await res.json();
+      console.log("fetched departements: ", data);
+      setDepartments(data);
+    } catch(err: any){
+      console.error('Faied to fetch departments:', err);
+      // setError(err.message);
+    }
+    // finally{
+    //   setLoading(false);
+    // }
+    };
+    fetchDepartments();
   }, []);
   
   // Apply filters whenever filters or invoices change
@@ -165,13 +202,22 @@ const Invoices: React.FC = () => {
 
     const handlePayment = async (paymentData: any) => {
     try {
-      console.log("paid maount is : ", paymentData);
-      await updateInvoicePayment(paymentDialog.billId, {
-        // paymentDate: paymentData.paymentDate,
-        paymentMethod: paymentData.paymentMethod,
+      const updatedInvoice = await updateInvoicePayment(paymentDialog.billId, {
+        paymentDate: paymentData.paymentDate,
+        paymentMethod: paymentData.paymentMethod,           // ID for BE
+        paymentMethodName: paymentData.paymentMethodName,   // Name for display
         paidAmount: paymentData.amount,
-        paymenReference: paymentData.paymentRefernce
+        paymentReference: paymentData.reference
       });
+
+      // Update local state with the response from BE
+      if (updatedInvoice) {
+        setInvoices(prev => prev.map(invoice => 
+          invoice._id === paymentDialog.billId 
+            ? { ...invoice, ...updatedInvoice }
+            : invoice
+        ));
+      }
 
       toast({
         title: "Payment Recorded",
@@ -380,7 +426,9 @@ const Invoices: React.FC = () => {
               </div>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" onClick={exportToCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          {isSuperAdmin && (
+            <Button variant="outline" onClick={exportToCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
+          )}
           <Button onClick={() => setCreateDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Create Invoice</Button>
         </div>
       </div>
@@ -562,23 +610,27 @@ const Invoices: React.FC = () => {
                       <div className="flex gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setViewInvoice(invoice)}
                           title="View Invoice"> <Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditInvoice(invoice)}
-                          title="Edit Invoice"><Edit className="h-4 w-4" /></Button>
+                        {(invoice.status !== 'paid' || isSuperAdmin) && (
+                          <Button variant="ghost" size="sm" onClick={() => setEditInvoice(invoice)}
+                            title="Edit Invoice"><Edit className="h-4 w-4" /></Button>
+                        )}
                         <Button variant="ghost" size="sm"><Send className="h-4 w-4" /></Button>     
-                        <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  onClick={() => setPaymentDialog({ 
-                                    open: true, 
-                                    billId: invoice._id, 
-                                    billNumber: invoice.invoiceNumber, 
-                                    amount: invoice.total
-                                  })}
-                                  title="Record Payment"
-                                  className="text-green-600 hover:text-green-800"
-                                >
-                                  <CreditCard className="h-4 w-4" />
-                                </Button>                   
+                        {invoice.status !== 'paid' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setPaymentDialog({ 
+                              open: true, 
+                              billId: invoice._id, 
+                              billNumber: invoice.invoiceNumber, 
+                              amount: invoice.remainingAmount ?? invoice.total
+                            })}
+                            title="Record Payment"
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                          </Button>
+                        )}                   
                       </div>
                     </TableCell>
                   </TableRow>

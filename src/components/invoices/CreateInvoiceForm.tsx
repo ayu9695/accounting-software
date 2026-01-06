@@ -39,6 +39,7 @@ interface Client {
   email: string;
   address?: string;
   gstin?: string;
+  department?: Department;
 }
 
 interface Department {
@@ -64,7 +65,7 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
     clientId:"",
     clientEmail: "",
     clientAddress: "",
-    department: undefined,
+    department: "",
     invoiceNumber: "",
     clientGST: "",
     issueDate: new Date().toISOString().split('T')[0],
@@ -218,18 +219,19 @@ export const CreateInvoiceForm: React.FC<CreateInvoiceFormProps> = ({
   // Handle client selection from autocomplete
   const handleClientSelect = (client: Client) => {
     console.log("selecting client: ", client);
+    // Extract department ID from the client's department object
+    const departmentId = client.department?._id || formData.department;
+    
     setFormData({
       ...formData,
       clientName: client.name,
       clientId: client._id,
       clientEmail: client.email,
       clientAddress: client.address || "",
-      clientGST: client.gstin || ""
+      clientGST: client.gstin || "",
+      department: departmentId
     });
-    if (!formData.department) {
-      delete formData.department;
-    }
-    console.log("setting form data: ", formData);
+    console.log("setting form data with department: ", departmentId);
     setClientSearch(client.name);
     setShowClientDropdown(false);
   };
@@ -563,6 +565,9 @@ const selectAllOnFocus = (e: React.FocusEvent<HTMLInputElement>) => {
                           >
                             <div className="font-medium">{client.name}</div>
                             <div className="text-sm text-gray-500">{client.email}</div>
+                            {client.department?.name && (
+                              <div className="text-xs text-blue-600">{client.department.name}</div>
+                            )}
                           </div>
                         ))
                       ) : (

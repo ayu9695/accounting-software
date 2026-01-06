@@ -240,6 +240,74 @@ export const useVendorBills = () => {
     }
   };
 
+  // Download PDF attachment for vendor bill
+  const downloadVendorBillPdf = async (billId: string, attachmentId: string, fileName?: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${baseUrl}/vendor-bills/${billId}/download/${attachmentId}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Get the blob from response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || `vendor-bill-${billId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("PDF downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast.error("Failed to download PDF");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Upload PDF for vendor bill
+  const uploadVendorBillPdf = async (id: string, file: File) => {
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append('pdf', file);
+
+      const response = await fetch(`${baseUrl}/vendor-bills/${id}/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const updatedBill = await response.json();
+      setVendorBills(prev => prev.map(bill => 
+        bill._id === id ? { ...bill, ...updatedBill.vendorBill || updatedBill } : bill
+      ));
+      toast.success("PDF uploaded successfully");
+      return updatedBill.vendorBill || updatedBill;
+    } catch (error) {
+      console.error("Error uploading PDF:", error);
+      toast.error("Failed to upload PDF");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Refresh data
   const refreshData = () => {
     fetchVendors();
@@ -260,6 +328,8 @@ export const useVendorBills = () => {
     error,
     filters,
     updateVendorPayment,
+    uploadVendorBillPdf,
+    downloadVendorBillPdf,
     updateFilters,
     clearFilters,
     getActiveFilters,
