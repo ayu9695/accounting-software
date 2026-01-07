@@ -78,6 +78,8 @@ export interface Invoice {
     ifscCode?: string;
     branch?: string;
   };
+  tdsDeducted: number;
+  tdsTotal: number;
 }
 
 interface ViewInvoiceDialogProps {
@@ -227,14 +229,12 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
                   <Download className="h-4 w-4 mr-2" />
                   Download PDF
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleSendInvoice} disabled={loading}>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Invoice
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => onEditInvoice(invoice)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
+                {invoice.status !== 'paid' && (
+                  <Button variant="outline" size="sm" onClick={() => onEditInvoice(invoice)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -445,6 +445,12 @@ export const ViewInvoiceDialog: React.FC<ViewInvoiceDialogProps> = ({
                       <span>₹{((invoice.subtotal - (invoice.subtotal * invoice.discount / 100)) * invoice.igst / 100).toFixed(2)}</span>
                     </div>
                   )}
+                  {invoice.tdsDeducted > 0 && (
+                    <div className="flex justify-between text-orange-600">
+                      <span>TDS Deducted ({invoice.tdsDeducted}%):</span>
+                      <span>-₹{(invoice.tdsTotal || ((invoice.subtotal - (invoice.subtotal * invoice.discount / 100) + invoice.taxAmount) * invoice.tdsDeducted / 100)).toFixed(2)}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total:</span>
@@ -492,9 +498,13 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
     sgst: 9,
     igst: 0,
     discount: 0,
+    tdsDeducted: 0,
     notes: "",
     status: 'unpaid' as 'paid' | 'unpaid' | 'partial' | 'overdue'
   });
+
+  // TDS Rate selection: '', '2', '10', or 'other'
+  const [tdsRateType, setTdsRateType] = useState<'' | '2' | '10' | 'other'>('');
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -709,6 +719,14 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
   const loadInvoiceData = () => {
     if (!invoice) return;
 
+    // Determine TDS rate type from invoice.tdsDeducted
+    const tds = invoice.tdsDeducted || 0;
+    let tdsType: '' | '2' | '10' | 'other' = '';
+    if (tds === 2) tdsType = '2';
+    else if (tds === 10) tdsType = '10';
+    else if (tds > 0) tdsType = 'other';
+    setTdsRateType(tdsType);
+
     setFormData({
       clientName: invoice.clientName,
       clientId: invoice.clientId,
@@ -722,6 +740,7 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
       sgst: invoice.sgst,
       igst: invoice.igst,
       discount: invoice.discount,
+      tdsDeducted: tds,
       notes: invoice.notes || "",
       status: invoice.status
     });
@@ -813,6 +832,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
   const igstAmount = (taxableAmount * formData.igst) / 100;
   const totalTax = cgstAmount + sgstAmount + igstAmount;
   const total = taxableAmount + totalTax;
+  // TDS amount is calculated for display/record but doesn't affect total
+  const tdsAmount = (total * formData.tdsDeducted) / 100;
 
    const normalizeFEToServerLineItems = (items: LineItem[]) => {
     return items.map(it => {
@@ -870,6 +891,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
         sgstAmount,
         igstAmount,
         totalTax,
+        tdsDeducted: formData.tdsDeducted,
+        tdsAmount,
         total,
         bankAccountDetails: bankPayload
       };
@@ -1160,7 +1183,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                         <Input
                           type="number"
                           step="0.01"
-                          value={item.rate}
+                          value={item.rate || ''}
+                          placeholder="0.00"
                           onChange={(e) => updateLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
                           className="mt-1"
                         />
@@ -1170,7 +1194,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                         <Input
                           type="number"
                           step="0.01"
-                          value={item.amount}
+                          value={item.amount || ''}
+                          placeholder="0.00"
                           onChange={(e) => updateLineItem(item.id, 'amount', parseFloat(e.target.value) || 0)}
                           className="mt-1"
                         />
@@ -1214,7 +1239,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                               type="number"
                               min="0"
                               step="0.01"
-                              value={item.hours ?? 0}
+                              value={item.hours || ''}
+                              placeholder="0"
                               onChange={(e) => updateLineItem(item.id, 'hours', parseFloat(e.target.value) || 0)}
                               className="mt-1"
                             />
@@ -1229,7 +1255,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                               type="number"
                               min="0"
                               step="0.01"
-                              value={item.lop ?? 0}
+                              value={item.lop || ''}
+                              placeholder="0"
                               onChange={(e) => updateLineItem(item.id, 'lop', parseFloat(e.target.value) || 0)}
                               className="mt-1"
                             />
@@ -1240,7 +1267,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                               type="number"
                               min="0"
                               step="0.01"
-                              value={item.extraDays ?? 0}
+                              value={item.extraDays || ''}
+                              placeholder="0"
                               onChange={(e) => updateLineItem(item.id, 'extraDays', parseFloat(e.target.value) || 0)}
                               className="mt-1"
                             />
@@ -1285,13 +1313,13 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
             </CardContent>
           </Card>
 
-          {/* Tax Configuration */}
+          {/* Discounts */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg text-blue-700">Tax Configuration</CardTitle>
+              <CardTitle className="text-lg text-blue-700">Discounts</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="discount">Discount (%)</Label>
                   <Input
@@ -1300,10 +1328,30 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                     min="0"
                     max="100"
                     step="0.01"
-                    value={formData.discount}
+                    value={formData.discount || ''}
+                    placeholder="0"
                     onChange={(e) => setFormData({ ...formData, discount: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-600">Discount Amount</Label>
+                  <Input
+                    value={`₹${discountAmount.toFixed(2)}`}
+                    readOnly
+                    className="bg-gray-100 mt-1"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tax Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-700">Tax Configuration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="cgst">CGST (%)</Label>
                   <Input
@@ -1312,7 +1360,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                     min="0"
                     max="50"
                     step="0.01"
-                    value={formData.cgst}
+                    value={formData.cgst || ''}
+                    placeholder="0"
                     onChange={(e) => setFormData({ ...formData, cgst: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
@@ -1324,7 +1373,8 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                     min="0"
                     max="50"
                     step="0.01"
-                    value={formData.sgst}
+                    value={formData.sgst || ''}
+                    placeholder="0"
                     onChange={(e) => setFormData({ ...formData, sgst: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
@@ -1336,10 +1386,52 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                     min="0"
                     max="50"
                     step="0.01"
-                    value={formData.igst}
+                    value={formData.igst || ''}
+                    placeholder="0"
                     onChange={(e) => setFormData({ ...formData, igst: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
+                <div>
+                  <Label htmlFor="tdsRate">TDS Rate</Label>
+                  <Select 
+                    value={tdsRateType} 
+                    onValueChange={(value: '' | '2' | '10' | 'other') => {
+                      setTdsRateType(value);
+                      if (value === '2') {
+                        setFormData({ ...formData, tdsDeducted: 2 });
+                      } else if (value === '10') {
+                        setFormData({ ...formData, tdsDeducted: 10 });
+                      } else if (value === '') {
+                        setFormData({ ...formData, tdsDeducted: 0 });
+                      }
+                      // For 'other', keep the existing value or let user enter
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select TDS" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2%</SelectItem>
+                      <SelectItem value="10">10%</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {tdsRateType === 'other' && (
+                  <div>
+                    <Label htmlFor="customTds">Custom TDS Rate (%)</Label>
+                    <Input
+                      id="customTds"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={formData.tdsDeducted || ''}
+                      onChange={(e) => setFormData({ ...formData, tdsDeducted: parseFloat(e.target.value) || 0 })}
+                      placeholder="Enter TDS %"
+                    />
+                  </div>
+                )}
               </div>
               
               {/* Calculation Summary */}
@@ -1372,6 +1464,12 @@ export const EditInvoiceDialog: React.FC<EditInvoiceDialogProps> = ({
                       <span>IGST ({formData.igst}%):</span>
                       <span>₹{igstAmount.toFixed(2)}</span>
                     </div>
+                    {formData.tdsDeducted > 0 && (
+                      <div className="flex justify-between text-orange-600">
+                        <span>TDS Deducted ({formData.tdsDeducted}%):</span>
+                        <span>-₹{tdsAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-bold text-lg border-t pt-2">
                       <span>Total:</span>
                       <span>₹{total.toFixed(2)}</span>

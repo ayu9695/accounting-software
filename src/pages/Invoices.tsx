@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Download, Filter, Eye, Edit, Send, CalendarIcon, X, CreditCard } from "lucide-react";
+import { PlusCircle, Download, Filter, Eye, Edit, CalendarIcon, X, CreditCard } from "lucide-react";
 import { CreateInvoiceForm } from "@/components/invoices/CreateInvoiceForm";
 import { Invoice, ViewInvoiceDialog, EditInvoiceDialog } from "@/components/invoices/InvoicesDialog";
 import { format } from "date-fns";
@@ -610,11 +610,10 @@ const Invoices: React.FC = () => {
                       <div className="flex gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setViewInvoice(invoice)}
                           title="View Invoice"> <Eye className="h-4 w-4" /></Button>
-                        {(invoice.status !== 'paid' || isSuperAdmin) && (
+                        {invoice.status !== 'paid' && (
                           <Button variant="ghost" size="sm" onClick={() => setEditInvoice(invoice)}
                             title="Edit Invoice"><Edit className="h-4 w-4" /></Button>
                         )}
-                        <Button variant="ghost" size="sm"><Send className="h-4 w-4" /></Button>     
                         {invoice.status !== 'paid' && (
                           <Button 
                             variant="ghost" 
