@@ -121,11 +121,9 @@ const Login: React.FC = () => {
             <Button type="submit" className="w-full">
               Sign in
             </Button>
-            <div className="text-center">
-              <Button variant="link" className="text-sm">
-                Forgot your password?
-              </Button>
-            </div>
+            <p className="text-center text-sm text-gray-500">
+              Forgot your password? Contact administrator
+            </p>
           </form>
         </CardContent>
       </Card>
