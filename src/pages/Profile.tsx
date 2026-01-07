@@ -9,12 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from '@/auth/AuthContext';
-import { Users, Plus, Edit, Trash2, PlusCircle } from "lucide-react";
+import { Users, Edit, Trash2, PlusCircle } from "lucide-react";
 
 interface User {
   _id: string;
@@ -67,7 +67,7 @@ const [editUser, setEditUser] = useState({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const canManageUsers = ['superadmin', 'admin'].includes(user?.role);
+  const canManageUsers = ['superadmin'].includes(user?.role);
   const canAddAdmins = user?.role === 'superadmin';
 
   const [oldPassword, setOldPassword] = useState('');
@@ -196,7 +196,7 @@ useEffect(() => {
   }
 
   try {
-    const response = await fetch(`${baseUrl}/users`, {
+    const response = await fetch(`${baseUrl}/user-management`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -397,206 +397,6 @@ const handleSaveEditUser = async () => {
   }
 };
 
- const AddUserDialog = () => (
-    <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add new user
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Add New User</DialogTitle>
-          <DialogDescription>
-            Create a new user account with the specified details.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="add-name">Full Name *</Label>
-              <Input
-                id="add-name"
-                value={newUser.name}
-                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                placeholder="Enter full name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="add-email">Email *</Label>
-              <Input
-                id="add-email"
-                type="email"
-                value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                placeholder="Enter email address"
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="add-role">Role</Label>
-              <Select value={newUser.role} onValueChange={(value: 'admin' | 'team_member') => setNewUser({ ...newUser, role: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="team_member">Team Member</SelectItem>
-                  {canAddAdmins && <SelectItem value="admin">Admin</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="add-department">Department</Label>
-              <Input
-                id="add-department"
-                value={newUser.department}
-                onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
-                placeholder="Enter department"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="add-password">Password *</Label>
-            <Input
-              id="add-password"
-              type="password"
-              value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-              placeholder="Enter password"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="add-address">Address</Label>
-            <Textarea
-              id="add-address"
-              value={newUser.address}
-              onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
-              placeholder="Enter address"
-              className="min-h-[80px]"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="add-country">Country</Label>
-            <Input
-              id="add-country"
-              value={newUser.country}
-              onChange={(e) => setNewUser({ ...newUser, country: e.target.value })}
-              placeholder="Enter country"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleAddUser}>Create User</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-
-  const EditUserDialog = () => (
-    <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
-          <DialogDescription>
-            Update user information and settings.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="edit-name">Full Name *</Label>
-              <Input
-                id="edit-name"
-                value={editUser.name}
-                onChange={(e) => setEditUser({ ...editUser, name: e.target.value })}
-                placeholder="Enter full name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-email">Email *</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={editUser.email}
-                onChange={(e) => setEditUser({ ...editUser, email: e.target.value })}
-                placeholder="Enter email address"
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="edit-role">Role</Label>
-              <Select value={editUser.role} onValueChange={(value: 'admin' | 'team_member') => setEditUser({ ...editUser, role: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="team_member">Team Member</SelectItem>
-                  {canAddAdmins && <SelectItem value="admin">Admin</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit-department">Department</Label>
-              <Input
-                id="edit-department"
-                value={editUser.department}
-                onChange={(e) => setEditUser({ ...editUser, department: e.target.value })}
-                placeholder="Enter department"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="edit-address">Address</Label>
-            <Textarea
-              id="edit-address"
-              value={editUser.address}
-              onChange={(e) => setEditUser({ ...editUser, address: e.target.value })}
-              placeholder="Enter address"
-              className="min-h-[80px]"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="edit-country">Country</Label>
-            <Input
-              id="edit-country"
-              value={editUser.country}
-              onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
-              placeholder="Enter country"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="edit-active"
-              checked={editUser.isActive}
-              onCheckedChange={(checked) => setEditUser({ ...editUser, isActive: checked })}
-            />
-            <Label htmlFor="edit-active">Account Active</Label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsEditUserOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSaveEditUser}>Update User</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-
   if (loading) return <p>Loading settings...</p>;
   if (error || !currentUser) return <p>Error loading settings: {error}</p>;
 
@@ -736,11 +536,10 @@ const handleSaveEditUser = async () => {
                       Manage system users and their permissions
                     </CardDescription>
                   </div>
-                  {/* <Button>
+                  <Button onClick={() => setIsAddUserOpen(true)}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add new user
-                  </Button> */}
-                  <AddUserDialog/>
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -824,7 +623,198 @@ const handleSaveEditUser = async () => {
           </TabsContent>
           )}
       </Tabs>
-      <EditUserDialog />
+
+      {/* Add User Dialog */}
+      <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+            <DialogDescription>
+              Create a new user account with the specified details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="add-name">Full Name *</Label>
+                <Input
+                  id="add-name"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  placeholder="Enter full name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="add-email">Email *</Label>
+                <Input
+                  id="add-email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  placeholder="Enter email address"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="add-role">Role</Label>
+                <Select value={newUser.role} onValueChange={(value: 'admin' | 'team_member') => setNewUser({ ...newUser, role: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="team_member">Team Member</SelectItem>
+                    {canAddAdmins && <SelectItem value="admin">Admin</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="add-department">Department</Label>
+                <Input
+                  id="add-department"
+                  value={newUser.department}
+                  onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
+                  placeholder="Enter department"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="add-password">Password *</Label>
+              <Input
+                id="add-password"
+                type="password"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                placeholder="Enter password"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="add-address">Address</Label>
+              <Textarea
+                id="add-address"
+                value={newUser.address}
+                onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
+                placeholder="Enter address"
+                className="min-h-[80px]"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="add-country">Country</Label>
+              <Input
+                id="add-country"
+                value={newUser.country}
+                onChange={(e) => setNewUser({ ...newUser, country: e.target.value })}
+                placeholder="Enter country"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddUser}>Create User</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information and settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-name">Full Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editUser.name}
+                  onChange={(e) => setEditUser({ ...editUser, name: e.target.value })}
+                  placeholder="Enter full name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-email">Email *</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editUser.email}
+                  onChange={(e) => setEditUser({ ...editUser, email: e.target.value })}
+                  placeholder="Enter email address"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-role">Role</Label>
+                <Select value={editUser.role} onValueChange={(value: 'admin' | 'team_member') => setEditUser({ ...editUser, role: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="team_member">Team Member</SelectItem>
+                    {canAddAdmins && <SelectItem value="admin">Admin</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-department">Department</Label>
+                <Input
+                  id="edit-department"
+                  value={editUser.department}
+                  onChange={(e) => setEditUser({ ...editUser, department: e.target.value })}
+                  placeholder="Enter department"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-address">Address</Label>
+              <Textarea
+                id="edit-address"
+                value={editUser.address}
+                onChange={(e) => setEditUser({ ...editUser, address: e.target.value })}
+                placeholder="Enter address"
+                className="min-h-[80px]"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-country">Country</Label>
+              <Input
+                id="edit-country"
+                value={editUser.country}
+                onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
+                placeholder="Enter country"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="edit-active"
+                checked={editUser.isActive}
+                onCheckedChange={(checked) => setEditUser({ ...editUser, isActive: checked })}
+              />
+              <Label htmlFor="edit-active">Account Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditUserOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEditUser}>Update User</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 };
